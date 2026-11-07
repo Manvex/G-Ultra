@@ -1,9 +1,9 @@
 {
   "name": "g-ultra",
   "productName": "G Ultra",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "G Ultra: system monitoring and optimization for Windows and Android",
-  "author": "G Ultra",
+  "author": "ManvexRO",
   "license": "GPL-3.0-only",
   "repository": "github:Manvex/G-Ultra",
   "homepage": "https://github.com/Manvex/G-Ultra",
@@ -23,7 +23,7 @@
   "build": {
     "appId": "com.gultra.app",
     "productName": "G Ultra",
-    "copyright": "G Ultra",
+    "copyright": "Copyright © 2026 ManvexRO",
     "directories": {
       "output": "release",
       "buildResources": "build"

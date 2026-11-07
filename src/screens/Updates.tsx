@@ -161,7 +161,7 @@ export function UpdateSettings() {
         <div className="grow">
           <div className="row-title">G Ultra {__APP_VERSION__}</div>
           <div className="row-sub" style={{ whiteSpace: 'normal' }}>
-            {u?.available ? `Version ${u.version} is available.` : bridge.platform === 'android' ? 'Your data stays on your phone. G Ultra only goes online for its own updates.' : 'Your data stays on your PC. G Ultra only goes online for its own updates and, on the Drivers screen, Windows Update. Sensors use LibreHardwareMonitor (MPL-2.0) and the PawnIO driver.'}
+            By ManvexRO. {u?.available ? `Version ${u.version} is available.` : bridge.platform === 'android' ? 'Your data stays on your phone. G Ultra only goes online for its own updates.' : 'Your data stays on your PC. G Ultra only goes online for its own updates and, on the Drivers screen, Windows Update. Sensors use LibreHardwareMonitor (MPL-2.0) and the PawnIO driver.'}
           </div>
         </div>
         {u?.available ? (
