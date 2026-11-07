@@ -1,0 +1,155 @@
+<div align="center">
+
+<img src="build/icon.png" alt="G Ultra logo" width="128" height="128">
+
+# G Ultra
+
+**See what your PC or phone is really doing, then fix it.**
+
+Temperatures, RAM, disk wear, battery health, fans and cleanup in one dark, fluid glass app for Windows and Android.
+
+[![Download for Windows](https://img.shields.io/badge/Download-Windows%20installer-2f81f7?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/Manvex/G-Ultra/releases/latest/download/G-Ultra-Setup-1.0.0.exe)
+[![Download for Android](https://img.shields.io/badge/Download-Android%20APK-3ddc84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Manvex/G-Ultra/releases/latest/download/G-Ultra-1.0.0.apk)
+
+[![Latest release](https://img.shields.io/github/v/release/Manvex/G-Ultra?style=flat-square)](https://github.com/Manvex/G-Ultra/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Manvex/G-Ultra/total?style=flat-square)](https://github.com/Manvex/G-Ultra/releases)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/Manvex/G-Ultra?style=flat-square)](https://github.com/Manvex/G-Ultra/stargazers)
+
+</div>
+
+## What it does
+
+| | |
+|---|---|
+| **Monitor** | Follow your system live, including from the background in a low-power mode, starting with your PC or phone. |
+| **Memory** | See RAM type, modules and usage, what's using it, how far you can upgrade, and the health of each module. Free up RAM in one tap. |
+| **Thermals** | Read temperatures and find out what's heating your CPU. |
+| **Fans** | Set your own fan speeds, with safety limits that can't be turned off. |
+| **Graphics** | Adjust settings for your graphics card. |
+| **Battery** | Check battery wear and use settings that save charge and extend its lifespan. Only appears on devices with a battery. |
+| **Storage** | See what's filling your drives. |
+| **Cleanup** | Remove caches and temporary files, without touching anything still in use. |
+| **Health** | Check the wear on your SSD and other components. |
+| **Components** | List every part in your device, so you know what to buy when replacing one. |
+
+### Automatic rules
+
+The background monitor can act for you. For example, it can free RAM when usage passes a level you choose, close the processes you pick every few minutes, or hold cooling at a set level.
+
+Long jobs run in the background too, so you can keep using the app while a cleanup or scan finishes.
+
+## Windows or Android
+
+| | Windows | Android |
+|---|:-:|:-:|
+| Monitor and background rules | ✓ | ✓ |
+| Memory, storage, cleanup and health | ✓ | ✓ |
+| Components list | ✓ | ✓ |
+| Battery | ✓ | ✓ |
+| Thermals | ✓ | ✓ |
+| Fan control | ✓ | |
+| Graphics settings | ✓ | |
+
+What you can read depends on your hardware and on what each system allows apps to access, and Android is the more restricted of the two.
+
+## Install
+
+### Windows 10 and 11
+
+1. Download [the installer](https://github.com/Manvex/G-Ultra/releases/latest/download/G-Ultra-Setup-1.0.0.exe).
+2. Run it. If Windows SmartScreen appears, select **More info**, then **Run anyway**. It appears because the installer doesn't have a paid code-signing certificate yet.
+3. Leave the sensor driver ticked unless you have a reason not to (see below).
+
+G Ultra asks for administrator rights because sensors and fan control need them. On a standard account it runs in limited mode.
+
+#### About the sensor driver
+
+Windows doesn't give apps direct access to CPU temperature sensors or fan controllers. To read them, G Ultra uses [PawnIO](https://github.com/namazso/PawnIO), a signed open-source driver.
+
+The installer includes it as an option, ticked by default. If you untick it, everything else still works, but you won't see the CPU temperature, and fan control and temperature rules may not be available. You can add it later from the **Thermals** screen.
+
+Uninstalling G Ultra removes PawnIO only if G Ultra was the one that installed it.
+
+### Android 8 and later
+
+Download [the APK](https://github.com/Manvex/G-Ultra/releases/latest/download/G-Ultra-1.0.0.apk), open it, and allow installs from your browser if Android asks.
+
+To run in the background, Android requires a visible notification, and it may delay checks while the phone sleeps.
+
+## Built to be safe
+
+- **Cleanup can't be pointed elsewhere.** The interface only sends category names, and the paths to delete are fixed in [`Cleaner.cs`](electron/helper/src/Cleaner.cs).
+- **Important folders are off limits.** Cleanup refuses roots like `C:\`, your user profile, Windows and Desktop, and never follows junctions or symlinks.
+- **Recent files stay.** Temp files newer than 24 hours and files in use are left alone.
+- **Critical processes stay running.** Critical Windows processes can't be closed from the app.
+- **Fans have limits.** They can't go below 30%, and they return to automatic at 90°C on the CPU or GPU and whenever the app closes.
+
+## Build it yourself
+
+You need Node 22 or later. For Android, you also need Android Studio with JDK and SDK 36. The Windows helper compiles with `csc.exe` from .NET Framework, which ships with Windows.
+
+```bash
+npm install
+```
+
+Download the sensor libraries and the setup files the installer bundles, checking the setup files against pinned hashes:
+
+```bash
+npm run setup
+```
+
+Build the Windows installer:
+
+```bash
+npm run dist:win
+```
+
+Build the Android APK:
+
+```bash
+npm run dist:android
+```
+
+The results land in `release/`. On its first run, the Android build creates your own signing key in `android/`. Keep that key private and back it up, because phones only accept updates signed with the same key.
+
+To work on the interface in a browser with demo data, add `?os=android` to the URL for the phone version:
+
+```bash
+npm run dev
+```
+
+### Project layout
+
+| Folder | What's in it |
+|---|---|
+| `src/` | The React interface, shared by both platforms |
+| `electron/` | The Windows app |
+| `electron/helper/src/` | The native C# helper: RAM, processes, SMART, battery, cleanup, fans and GPU settings |
+| `android/` | The Android app, built with Capacitor |
+| `build/` | Icons and installer steps |
+| `scripts/` | Build, icon and download scripts |
+
+### Tests
+
+These only touch their own temp folder, processes they create, and one registry value for a fake program, which they remove again:
+
+```bash
+node scripts/build-helper.mjs --selftest %TEMP%\gultra-test
+```
+
+```bash
+%TEMP%\gultra-test\GUltraSelfTest.exe %TEMP%\gultra-test
+```
+
+## Contributing
+
+Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for what to include.
+
+If G Ultra is useful to you, a star helps other people find it.
+
+## License
+
+G Ultra is free software under the [GNU General Public License v3.0](LICENSE). You can use, change and sell it, as long as anything you distribute based on it stays under the same license with its source available.
+
+Bundled projects keep their own licenses, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The license doesn't cover the G Ultra name or logo.

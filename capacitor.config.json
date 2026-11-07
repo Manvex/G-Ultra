@@ -1,0 +1,10 @@
+{
+  "appId": "com.gultra.app",
+  "appName": "G Ultra",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#0b0c10",
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  }
+}

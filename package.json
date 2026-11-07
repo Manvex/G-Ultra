@@ -1,0 +1,109 @@
+{
+  "name": "g-ultra",
+  "productName": "G Ultra",
+  "version": "1.0.0",
+  "description": "G Ultra: system monitoring and optimization for Windows and Android",
+  "author": "G Ultra",
+  "license": "GPL-3.0-only",
+  "repository": "github:Manvex/G-Ultra",
+  "homepage": "https://github.com/Manvex/G-Ultra",
+  "private": true,
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build:web": "tsc --noEmit && vite build",
+    "build:helper": "node scripts/build-helper.mjs",
+    "icons": "node scripts/gen-icons.mjs",
+    "start": "npm run build:web && electron .",
+    "dist:win": "npm run build:helper && npm run build:web && electron-builder --win --x64",
+    "dist:android": "npm run build:web && npx cap sync android && node scripts/build-apk.mjs",
+    "setup": "node scripts/fetch-lhm.mjs && node scripts/fetch-drivers.mjs"
+  },
+  "build": {
+    "appId": "com.gultra.app",
+    "productName": "G Ultra",
+    "copyright": "G Ultra",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "electron/main.cjs",
+      "electron/preload.cjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "electron/helper/bin",
+        "to": "helper",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "build/drivers",
+        "to": "drivers",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "LICENSE",
+        "to": "LICENSE.txt"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "highestAvailable",
+      "artifactName": "G-Ultra-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "shortcutName": "G Ultra",
+      "artifactName": "G-Ultra-Setup-${version}.${ext}",
+      "include": "build/installer.nsh",
+      "installerLanguages": [
+        "en_US"
+      ],
+      "language": "1033",
+      "uninstallDisplayName": "G Ultra"
+    },
+    "npmRebuild": false,
+    "electronLanguages": [
+      "en-US"
+    ]
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@fontsource-variable/inter": "^5.3.0",
+    "lucide-react": "^1.70.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "sharp": "^0.35.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6"
+  }
+}
