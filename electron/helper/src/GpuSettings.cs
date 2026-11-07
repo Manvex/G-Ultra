@@ -129,6 +129,45 @@ namespace GUltra
             return SmiResult("-i " + index + " -rgc");
         }
 
+        // ---- Windows: which apps are using the GPU, measured like Task Manager ----
+        static readonly Regex EngineName = new Regex(@"pid_(\d+)_.*engtype_(\w+)", RegexOptions.IgnoreCase);
+
+        public static object Apps()
+        {
+            var usage = new Dictionary<int, Dictionary<string, float>>();
+            try
+            {
+                var category = new PerformanceCounterCategory("GPU Engine");
+                InstanceDataCollection before = category.ReadCategory()["Utilization Percentage"];
+                System.Threading.Thread.Sleep(700);
+                InstanceDataCollection after = category.ReadCategory()["Utilization Percentage"];
+                foreach (InstanceData now in after.Values)
+                {
+                    InstanceData old = before[now.InstanceName];
+                    var m = EngineName.Match(now.InstanceName);
+                    if (old == null || !m.Success) continue;
+                    int pid = int.Parse(m.Groups[1].Value);
+                    float value = CounterSample.Calculate(old.Sample, now.Sample);
+                    Dictionary<string, float> engines;
+                    if (!usage.TryGetValue(pid, out engines)) usage[pid] = engines = new Dictionary<string, float>();
+                    float sum;
+                    engines.TryGetValue(m.Groups[2].Value, out sum);
+                    engines[m.Groups[2].Value] = sum + value;
+                }
+            }
+            catch { }
+
+            var list = new List<object>();
+            foreach (var kv in usage.Select(u => new { Pid = u.Key, Percent = u.Value.Values.Max() }).Where(u => u.Percent >= 1).OrderByDescending(u => u.Percent).Take(8))
+            {
+                string name = null;
+                try { using (var p = Process.GetProcessById(kv.Pid)) name = p.ProcessName; }
+                catch { continue; }
+                list.Add(J.D("pid", kv.Pid, "name", name, "percent", J.R(Math.Min(100f, kv.Percent), 1)));
+            }
+            return list;
+        }
+
         // ---- Windows: which GPU each app runs on ----
         static readonly Regex PrefPattern = new Regex(@"GpuPreference=(\d);?", RegexOptions.IgnoreCase);
 

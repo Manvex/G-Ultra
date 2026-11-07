@@ -433,10 +433,10 @@ export interface MonitorConfig {
   enabled: boolean;
   mode: 'economy' | 'balanced' | 'realtime';
   notifications: boolean;
-  ram: { enabled: boolean; threshold: number; standby: boolean; cooldownMin: number; closeApps: boolean };
+  ram: { enabled: boolean; threshold: number; standby: boolean; cooldownMin: number; closeApps: boolean; useTimer?: boolean };
   ramTimer: { enabled: boolean; everyMin: number; closeApps: boolean };
   closeApps: string[];
-  temp: { enabled: boolean; threshold: number; limitCpu: boolean; limitPercent: number };
+  temp: { enabled: boolean; threshold: number; limitCpu: boolean; limitPercent: number; coolMode?: boolean };
   fan: { mode: 'auto' | 'fixed' | 'curve'; percent: number; lowTemp: number; lowPercent: number; highTemp: number; highPercent: number };
   clean: { enabled: boolean; freeGb: number };
   battery: { alert: boolean; alertPercent: number; efficiency: boolean; lowPercent: number };
@@ -541,4 +541,63 @@ export interface UpdateInfo {
 export interface UpdateStart {
   started?: boolean;
   needsPermission?: boolean;
+}
+
+export interface CpuTuningInfo {
+  mode: 'cool' | 'balanced' | 'performance' | 'custom';
+  boost: boolean | null;
+  maxAc: number | null;
+  maxDc: number | null;
+  coolingActive: boolean | null;
+  overclock: {
+    status: 'unlocked' | 'maybe' | 'locked' | 'unknown';
+    cpu: string;
+    tool: string | null;
+    url: string | null;
+    installed: boolean;
+  };
+}
+
+export interface GpuAppUse {
+  pid: number;
+  name: string;
+  percent: number;
+}
+
+export interface BinItem {
+  id: string;
+  name: string;
+  original: string;
+  size: number;
+  deletedMs: number;
+  isDir: boolean;
+}
+
+export interface RecoverDrives {
+  drives: { letter: string; label: string; format: string; total: number; free: number; ntfs: boolean }[];
+  elevated: boolean;
+}
+
+export interface RecoverScanState {
+  state: 'running' | 'done' | 'cancelled' | 'failed';
+  percent?: number;
+  found?: number;
+  truncated?: boolean;
+  message?: string;
+}
+
+export interface RecoverPage {
+  total: number;
+  drive: string | null;
+  items: { id: number; name: string; path: string; size: number; modifiedMs: number; category: string; chance: string }[];
+}
+
+export interface RecoverResult {
+  folder: string;
+  results: { id: number; name: string; ok: boolean; path?: string; whole?: boolean; message?: string }[];
+}
+
+export interface PhoneTrash {
+  supported: boolean;
+  items: { uri: string; name: string; size: number; expiresMs: number }[];
 }

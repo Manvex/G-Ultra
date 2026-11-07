@@ -6,6 +6,7 @@ import { loadData, useData, useLive, useSystem } from '../lib/store';
 import type { HistoryPoint, MonitorConfig, MonitorInfo } from '../lib/types';
 import { LineChart, ChartLegend, type Series } from '../ui/charts';
 import { AppIcon, Glass, PageHead, Segmented, Slider, Switch, toast } from '../ui/kit';
+import { CpuModeRule } from './Cooling';
 
 function Rule({ icon: Icon, title, text, on, onToggle, children }: { icon: typeof Bell; title: string; text: string; on: boolean; onToggle: (v: boolean) => void; children?: ReactNode }) {
   return (
@@ -284,17 +285,25 @@ export function Monitor() {
             onToggle={(enabled) => section('ram', { enabled })}
           >
             <Level label="Act above" value={cfg.ram.threshold} min={50} max={98} unit="%" onChange={(threshold) => section('ram', { threshold })} />
-            <Choice
-              label="Wait at least this long between runs"
-              value={String(cfg.ram.cooldownMin)}
-              options={[
-                { value: '5', label: '5 min' },
-                { value: '10', label: '10 min' },
-                { value: '30', label: '30 min' },
-                { value: '60', label: '1 hour' },
-              ]}
-              onChange={(v) => section('ram', { cooldownMin: Number(v) })}
+            <Check
+              label="Use a timer"
+              text={cfg.ram.useTimer !== false ? 'Runs while memory stays over your limit, with a wait between runs.' : 'Runs each time memory goes over your limit, then waits until it comes back down.'}
+              on={cfg.ram.useTimer !== false}
+              onChange={(useTimer) => section('ram', { useTimer })}
             />
+            {cfg.ram.useTimer !== false && (
+              <Choice
+                label="Wait at least this long between runs"
+                value={String(cfg.ram.cooldownMin)}
+                options={[
+                  { value: '5', label: '5 min' },
+                  { value: '10', label: '10 min' },
+                  { value: '30', label: '30 min' },
+                  { value: '60', label: '1 hour' },
+                ]}
+                onChange={(v) => section('ram', { cooldownMin: Number(v) })}
+              />
+            )}
             {!isAndroid && <Check label="Also clear the standby cache" text="Frees the most, but files are read from the SSD again. Needs full mode." on={cfg.ram.standby} onChange={(standby) => section('ram', { standby })} />}
             {canCloseApps && <Check label="Also close the apps you picked" on={cfg.ram.closeApps} onChange={(closeApps) => section('ram', { closeApps })} />}
           </Rule>
@@ -328,8 +337,19 @@ export function Monitor() {
             ) : (
               <>
                 <Level label="Act above" value={cfg.temp.threshold} min={60} max={98} unit="°C" onChange={(threshold) => section('temp', { threshold })} />
-                <Check label="Slow the processor to cool it down" text="Back to normal once it's 8°C below your limit." on={cfg.temp.limitCpu} onChange={(limitCpu) => section('temp', { limitCpu })} />
-                {cfg.temp.limitCpu && <Level label="Limit the processor to" value={cfg.temp.limitPercent} min={50} max={95} step={5} unit="%" onChange={(limitPercent) => section('temp', { limitPercent })} />}
+                <Choice
+                  label="To cool it down"
+                  value={cfg.temp.coolMode ? 'cool' : cfg.temp.limitCpu ? 'limit' : 'alert'}
+                  options={[
+                    { value: 'alert', label: 'Only alert me' },
+                    { value: 'limit', label: 'Limit its speed' },
+                    { value: 'cool', label: 'Switch to Cool mode' },
+                  ]}
+                  onChange={(v) => section('temp', { coolMode: v === 'cool', limitCpu: v === 'limit' })}
+                />
+                {cfg.temp.coolMode && <p className="section-sub">Turns off Turbo Boost and limits speed, then puts your settings back once it's 8°C below your limit.</p>}
+                {cfg.temp.limitCpu && !cfg.temp.coolMode && <p className="section-sub">Back to normal once it's 8°C below your limit.</p>}
+                {cfg.temp.limitCpu && !cfg.temp.coolMode && <Level label="Limit the processor to" value={cfg.temp.limitPercent} min={50} max={95} step={5} unit="%" onChange={(limitPercent) => section('temp', { limitPercent })} />}
               </>
             )}
             {info.data?.cpuLimited && (
@@ -338,6 +358,8 @@ export function Monitor() {
               </div>
             )}
           </Rule>
+
+          {!isAndroid && <CpuModeRule />}
 
           {!isAndroid && (
             <div className="rule">

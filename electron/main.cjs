@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, Notification } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell, Notification } = require('electron');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -101,6 +101,8 @@ const ALLOWED = new Set([
   'monitorGet', 'monitorSet', 'monitorHistory', 'autostartSet',
   'ramHealth', 'ramTestStart', 'ramTestCancel', 'ramDiagnostic',
   'driversScan', 'driversInstalled', 'driversInstall',
+  'cpuTuning', 'cpuTuningMode', 'cpuTuningSet', 'overclockToolOpen', 'appEfficiencySet', 'appEfficiencyState', 'gpuApps',
+  'binList', 'binRestore', 'recoverDrives', 'recoverStart', 'recoverCancel', 'recoverList', 'recoverRun',
 ]);
 
 let win = null;
@@ -284,6 +286,10 @@ if (!gotLock) {
     });
     ipcMain.handle('elevate', () => relaunchElevated());
     ipcMain.handle('installDriver', () => installSensorDriver());
+    ipcMain.handle('pickFolder', async () => {
+      const r = await dialog.showOpenDialog(win, { title: 'Choose where to save recovered files', properties: ['openDirectory', 'createDirectory'] });
+      return r.canceled ? null : r.filePaths[0];
+    });
     ipcMain.handle('updateCheck', () => checkForUpdate());
     ipcMain.handle('updateInstall', () => installUpdate());
     ipcMain.handle('reveal', (_e, p) => {

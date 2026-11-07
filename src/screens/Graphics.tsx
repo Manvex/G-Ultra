@@ -7,6 +7,7 @@ import { loadData, useData, useLive, useSystem } from '../lib/store';
 import type { GpuInfo, GpuSample, NvidiaGpu } from '../lib/types';
 import { AppIcon, Bar, Glass, PageHead, Segmented, Slider, Stat, Switch, toast } from '../ui/kit';
 import { Liquid } from '../ui/Liquid';
+import { GpuApps, GpuCooling, GpuDiagnosis } from './Cooling';
 import { FanPanel } from './Fans';
 import { PALETTE } from './Home';
 import { requestElevation } from './Sheets';
@@ -252,7 +253,15 @@ export function Graphics({ nav }: { nav: (r: Route) => void }) {
         </Glass>
       )}
 
+      {gpus.map((g) => (
+        <GpuDiagnosis key={g.id} gpu={g} />
+      ))}
+      {nvidia.map((g) => (
+        <GpuCooling key={g.index} gpu={g} elevated={elevated} onChanged={reload} />
+      ))}
+
       <FanPanel group="gpu" />
+      <GpuApps />
 
       {nvidia.map((g) => (
         <NvidiaTuning key={g.index} gpu={g} elevated={elevated} onChanged={reload} />

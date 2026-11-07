@@ -3,15 +3,18 @@ import type {
   AndroidBatteryInfo,
   AndroidPermissions,
   AndroidStorage,
+  BinItem,
   BatteryReport,
   CleanRunResult,
   CleanScanResult,
   ComponentsData,
+  CpuTuningInfo,
   DisksInfo,
   DriverInstallResult,
   DriverScan,
   EndResult,
   FreeRamResult,
+  GpuAppUse,
   GpuInfo,
   HealthData,
   HistoryPoint,
@@ -20,8 +23,12 @@ import type {
   MemoryDetails,
   MonitorConfig,
   MonitorInfo,
+  PhoneTrash,
   Platform,
   RamHealthData,
+  RecoverDrives,
+  RecoverPage,
+  RecoverResult,
   ScanNode,
   StartupApp,
   SystemInfo,
@@ -59,6 +66,21 @@ export interface WindowsApi {
   driversScan(): Promise<DriverScan>;
   driversInstalled(): Promise<InstalledDrivers>;
   driversInstall(ids: string[], allowNoRestorePoint: boolean): Promise<DriverInstallResult>;
+  cpuTuning(): Promise<CpuTuningInfo>;
+  cpuTuningMode(mode: string): Promise<CpuTuningInfo>;
+  cpuTuningSet(key: string, value: number): Promise<CpuTuningInfo>;
+  overclockToolOpen(): Promise<unknown>;
+  appEfficiencySet(pids: number[], on: boolean): Promise<{ changed: number; failed: number }>;
+  appEfficiencyState(pids: number[]): Promise<number[]>;
+  gpuApps(): Promise<GpuAppUse[]>;
+  pickFolder(): Promise<string | null>;
+  binList(): Promise<BinItem[]>;
+  binRestore(ids: string[]): Promise<{ id: string; ok: boolean; message: string }[]>;
+  recoverDrives(): Promise<RecoverDrives>;
+  recoverStart(drive: string): Promise<unknown>;
+  recoverCancel(): Promise<unknown>;
+  recoverList(category: string, search: string, limit: number): Promise<RecoverPage>;
+  recoverRun(ids: number[], folder: string): Promise<RecoverResult>;
 }
 
 export interface AndroidApi {
@@ -73,6 +95,8 @@ export interface AndroidApi {
   batterySet(key: string, value: number): Promise<unknown>;
   openSystemScreen(screen: string): Promise<unknown>;
   requestNotifications(): Promise<unknown>;
+  trashList(): Promise<PhoneTrash>;
+  trashRestore(uris: string[]): Promise<unknown>;
 }
 
 export interface Bridge {
@@ -118,6 +142,7 @@ declare global {
       installDriver(): Promise<{ ok: boolean; code: number }>;
       updateCheck(): Promise<UpdateInfo>;
       updateInstall(): Promise<UpdateStart>;
+      pickFolder(): Promise<string | null>;
       reveal(path: string): Promise<void>;
       trash(path: string): Promise<boolean>;
       openLink(url: string): Promise<void>;
@@ -191,6 +216,21 @@ function windowsBridge(): Bridge {
       driversScan: () => n.rpc('driversScan'),
       driversInstalled: () => n.rpc('driversInstalled'),
       driversInstall: (ids, allowNoRestorePoint) => n.rpc('driversInstall', { ids, allowNoRestorePoint }),
+      cpuTuning: () => n.rpc('cpuTuning'),
+      cpuTuningMode: (mode) => n.rpc('cpuTuningMode', { mode }),
+      cpuTuningSet: (key, value) => n.rpc('cpuTuningSet', { key, value }),
+      overclockToolOpen: () => n.rpc('overclockToolOpen'),
+      appEfficiencySet: (pids, on) => n.rpc('appEfficiencySet', { pids, on }),
+      appEfficiencyState: (pids) => n.rpc('appEfficiencyState', { pids }),
+      gpuApps: () => n.rpc('gpuApps'),
+      pickFolder: () => n.pickFolder(),
+      binList: () => n.rpc('binList'),
+      binRestore: (ids) => n.rpc('binRestore', { ids }),
+      recoverDrives: () => n.rpc('recoverDrives'),
+      recoverStart: (drive) => n.rpc('recoverStart', { drive }),
+      recoverCancel: () => n.rpc('recoverCancel'),
+      recoverList: (category, search, limit) => n.rpc('recoverList', { category, search, limit }),
+      recoverRun: (ids, folder) => n.rpc('recoverRun', { ids, folder }),
     },
   };
 }
@@ -222,6 +262,8 @@ interface GUltraPlugin {
   monitorHistory(): Promise<{ points: HistoryPoint[] }>;
   monitorAutostart(o: { on: boolean }): Promise<any>;
   requestNotifications(): Promise<any>;
+  trashList(): Promise<PhoneTrash>;
+  trashRestore(o: { uris: string[] }): Promise<any>;
   updateCheck(): Promise<UpdateInfo>;
   updateInstall(): Promise<UpdateStart>;
   addListener(name: 'updateProgress', cb: (d: { percent: number }) => void): Promise<{ remove(): Promise<void> }>;
@@ -309,6 +351,8 @@ function androidBridge(): Bridge {
       batterySet: (key, value) => p.batterySet({ key, value }),
       openSystemScreen: (screen) => p.openSystemScreen({ screen }),
       requestNotifications: () => p.requestNotifications(),
+      trashList: () => p.trashList(),
+      trashRestore: (uris) => p.trashRestore({ uris }),
     },
   };
 }

@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('gultraNative', {
   window: (action) => ipcRenderer.invoke('window', action),
   elevate: () => ipcRenderer.invoke('elevate'),
   installDriver: () => ipcRenderer.invoke('installDriver'),
+  pickFolder: () => ipcRenderer.invoke('pickFolder'),
   updateCheck: () => ipcRenderer.invoke('updateCheck'),
   updateInstall: () => ipcRenderer.invoke('updateInstall'),
   reveal: (p) => ipcRenderer.invoke('reveal', p),

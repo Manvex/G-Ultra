@@ -31,6 +31,8 @@ import org.json.JSONObject;
  * doubles as the live status. It wakes only at long intervals, so it costs very little battery.
  */
 public class MonitorService extends Service {
+
+    private boolean ramArmed = true;
     private static final int STATUS_ID = 7400;
     private static final int ALERT_ID = 7401;
     private static final String CHANNEL_STATUS = "gultra.status";
@@ -169,7 +171,13 @@ public class MonitorService extends Service {
 
         // ---- memory ----
         JSONObject ram = cfg.optJSONObject("ram");
-        if (ram != null && ram.optBoolean("enabled") && load >= ram.optInt("threshold", 85) && MonitorStore.waited(this, "ramAt", ram.optLong("cooldownMin", 30))) {
+        int ramLimit = ram != null ? ram.optInt("threshold", 85) : 85;
+        if (load < ramLimit - 3) ramArmed = true;
+        // With the timer: at most once per wait. Without it: each time memory goes over the limit.
+        boolean ramDue = ram != null && ram.optBoolean("enabled") && load >= ramLimit
+            && (ram.optBoolean("useTimer", true) ? MonitorStore.waited(this, "ramAt", ram.optLong("cooldownMin", 30)) : ramArmed);
+        if (ramDue) {
+            ramArmed = false;
             MonitorStore.mark(this, "ramAt");
             int closed = ram.optBoolean("closeApps") ? closeApps(cfg, am) : 0;
             if (Build.VERSION.SDK_INT >= 34) {

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { BatteryMedium, CircuitBoard, Gpu, HardDrive, HeartPulse, House, Loader2, PackageCheck, MemoryStick, Minus, Radar, Settings, ShieldAlert, ShieldCheck, Sparkles, Square, Thermometer, X, type LucideIcon } from 'lucide-react';
+import { ArchiveRestore, BatteryMedium, CircuitBoard, Gpu, HardDrive, HeartPulse, House, Loader2, PackageCheck, MemoryStick, Minus, Radar, Settings, ShieldAlert, ShieldCheck, Sparkles, Square, Thermometer, X, type LucideIcon } from 'lucide-react';
 import logo from './assets/logo.png';
 import { bridge } from './lib/bridge';
 import { shortDevice } from './lib/format';
@@ -16,6 +16,7 @@ import { Health } from './screens/Health';
 import { Home } from './screens/Home';
 import { Memory } from './screens/Memory';
 import { Monitor } from './screens/Monitor';
+import { Recover } from './screens/Recover';
 import { Drivers } from './screens/Drivers';
 import { ElevateSheet, SettingsSheet } from './screens/Sheets';
 import { Storage } from './screens/Storage';
@@ -34,6 +35,7 @@ function routesFor(isAndroid: boolean, hasBattery: boolean): { id: Route; label:
     ...(hasBattery ? [{ id: 'battery' as Route, label: 'Battery', icon: BatteryMedium }] : []),
     { id: 'storage', label: 'Storage', icon: HardDrive },
     { id: 'clean', label: 'Cleanup', icon: Sparkles },
+    { id: 'recover', label: 'Recover', icon: ArchiveRestore },
     { id: 'health', label: 'Health', icon: HeartPulse },
     ...(isAndroid ? [] : [{ id: 'drivers' as Route, label: 'Drivers', icon: PackageCheck }]),
     { id: 'components', label: 'Components', icon: CircuitBoard },
@@ -287,6 +289,7 @@ export function App() {
             {route === 'battery' && <Battery nav={nav} />}
             {route === 'storage' && <Storage />}
             {route === 'clean' && <Clean />}
+            {route === 'recover' && <Recover />}
             {route === 'health' && <Health />}
             {route === 'drivers' && <Drivers />}
             {route === 'components' && <Components />}

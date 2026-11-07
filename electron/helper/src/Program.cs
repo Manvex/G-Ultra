@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading;
@@ -64,6 +65,20 @@ namespace GUltra
                 { "driversScan", p => Drivers.Scan() },
                 { "driversInstalled", p => Drivers.Installed() },
                 { "driversInstall", p => Drivers.Install(GetStrList(p, "ids"), GetBool(p, "allowNoRestorePoint")) },
+                { "cpuTuning", p => CpuTuning.Info() },
+                { "cpuTuningMode", p => CpuTuning.SetMode(GetStr(p, "mode")) },
+                { "cpuTuningSet", p => CpuTuning.Set(GetStr(p, "key"), GetNum(p, "value")) },
+                { "overclockToolOpen", p => CpuTuning.OpenTool() },
+                { "appEfficiencySet", p => CpuTuning.AppEfficiencySet(GetIntList(p, "pids"), GetBool(p, "on")) },
+                { "appEfficiencyState", p => CpuTuning.AppEfficiencyState(GetIntList(p, "pids")) },
+                { "gpuApps", p => GpuSettings.Apps() },
+                { "binList", p => RecycleBin.List() },
+                { "binRestore", p => RecycleBin.Restore(GetStrList(p, "ids")) },
+                { "recoverDrives", p => DeepRecovery.Drives() },
+                { "recoverStart", p => DeepRecovery.Start(GetStr(p, "drive")) },
+                { "recoverCancel", p => DeepRecovery.Cancel() },
+                { "recoverList", p => DeepRecovery.List(GetStr(p, "category"), GetStr(p, "search"), (int)GetNum(p, "limit")) },
+                { "recoverRun", p => DeepRecovery.Recover(GetIntList(p, "ids").Select(i => (long)i).ToList(), GetStr(p, "folder")) },
                 { "ping", p => "pong" },
             };
 
@@ -85,6 +100,13 @@ namespace GUltra
             {
                 // Diagnostics: --once method writes one result and exits.
                 Handle("{\"id\":0,\"method\":\"" + args[1] + "\"}");
+                Environment.Exit(0);
+            }
+
+            // The uninstaller runs this, so a removed G Ultra doesn't leave the processor limited.
+            if (args.Length > 0 && args[0] == "--restore-cpu")
+            {
+                try { CpuTuning.Restore(); } catch { }
                 Environment.Exit(0);
             }
 

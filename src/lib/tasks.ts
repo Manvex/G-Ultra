@@ -2,10 +2,10 @@ import { useSyncExternalStore } from 'react';
 import { bridge } from './bridge';
 import { bytes, int, plural } from './format';
 import { loadData, store } from './store';
-import type { CleanCategory, CleanRunResult, DriverInstallResult, DriverScan, FreeRamResult, RamTestState, ScanNode, ScanProgress, UpdateInfo } from './types';
+import type { CleanCategory, CleanRunResult, DriverInstallResult, DriverScan, FreeRamResult, RamTestState, RecoverPage, RecoverResult, RecoverScanState, ScanNode, ScanProgress, UpdateInfo } from './types';
 import { toast } from '../ui/kit';
 
-export type RouteId = 'home' | 'monitor' | 'memory' | 'thermal' | 'gpu' | 'battery' | 'storage' | 'clean' | 'health' | 'drivers' | 'components';
+export type RouteId = 'home' | 'monitor' | 'memory' | 'thermal' | 'gpu' | 'battery' | 'storage' | 'clean' | 'recover' | 'health' | 'drivers' | 'components';
 
 export interface Activity {
   id: string;
@@ -49,6 +49,17 @@ class Tasks {
   driverResult: DriverInstallResult | null = null;
   driverConfirm: { ids: string[]; message: string } | null = null;
   private driverChoice: Set<string> | null = null;
+
+  // File recovery
+  recoverState: RecoverScanState | null = null;
+  recoverDrive: string | null = null;
+  recoverPage: RecoverPage | null = null;
+  recoverCategory = 'all';
+  recoverSearch = '';
+  recoverSelected = new Set<number>();
+  recovering = false;
+  recoverResult: RecoverResult | null = null;
+  private recoverTimer = 0;
 
   // App updates
   update: UpdateInfo | null = null;
@@ -113,6 +124,10 @@ class Tasks {
         this.setActivity({ id: 'clean', label: 'Cleaning up', detail: `${data.name} · ${bytes(data.freed)} freed`, route: 'clean' });
       } else if (name === 'ramTest') {
         this.onRamTest(data);
+      } else if (name === 'recoverScan') {
+        this.onRecoverScan(data);
+      } else if (name === 'recoverCopy') {
+        this.setActivity({ id: 'recover', label: 'Recovering files', detail: `${data.index + 1} of ${data.total}`, route: 'recover' });
       } else if (name === 'driverInstall') {
         this.onDriverInstall(data);
       } else if (name === 'monitorEvent') {
@@ -370,6 +385,83 @@ class Tasks {
     const step = data.total && data.total > 1 ? ` (${(data.index ?? 0) + 1} of ${data.total})` : '';
     const detail = data.stage === 'restore' ? 'Creating a restore point' : data.stage === 'download' ? `Downloading${step}` : `Installing${step}`;
     this.setActivity({ id: 'driversInstall', label: 'Installing drivers', detail, route: 'drivers' });
+  }
+
+  // ---- file recovery ----
+  recoverStart(drive: string) {
+    if (this.recoverState?.state === 'running') return;
+    this.recoverDrive = drive;
+    this.recoverState = { state: 'running', percent: 0, found: 0 };
+    this.recoverPage = null;
+    this.recoverResult = null;
+    this.recoverSelected = new Set();
+    this.setActivity({ id: 'recoverScan', label: `Scanning ${drive}: for deleted files`, route: 'recover' });
+    bridge.win!.recoverStart(drive).catch((e: Error) => this.onRecoverScan({ state: 'failed', message: e.message }));
+  }
+
+  recoverCancel() {
+    void bridge.win!.recoverCancel();
+  }
+
+  private onRecoverScan(data: RecoverScanState) {
+    this.recoverState = data;
+    if (data.state === 'running') {
+      this.setActivity({ id: 'recoverScan', label: `Scanning ${this.recoverDrive}: for deleted files`, detail: `${data.percent ?? 0}%`, route: 'recover' });
+      return;
+    }
+    this.endActivity('recoverScan');
+    if (data.state === 'done') {
+      toast(`Scan finished: ${int(data.found ?? 0)} deleted files found.`);
+      bridge.win?.notify('Scan finished', `${int(data.found ?? 0)} deleted files found.`);
+      this.loadRecoverPage();
+    }
+  }
+
+  private loadRecoverPage() {
+    void bridge.win!.recoverList(this.recoverCategory, this.recoverSearch, 200).then(
+      (p) => {
+        this.recoverPage = p;
+        this.emit();
+      },
+      (e: Error) => toast(e.message, 'warning'),
+    );
+  }
+
+  recoverFilter(category: string, search: string) {
+    this.recoverCategory = category;
+    this.recoverSearch = search;
+    this.emit();
+    clearTimeout(this.recoverTimer);
+    this.recoverTimer = window.setTimeout(() => this.loadRecoverPage(), 300);
+  }
+
+  recoverToggle(id: number, on: boolean) {
+    const next = new Set(this.recoverSelected);
+    if (on) next.add(id);
+    else next.delete(id);
+    this.recoverSelected = next;
+    this.emit();
+  }
+
+  async recoverRun(ids: number[], folder: string) {
+    if (this.recovering) return;
+    this.recovering = true;
+    this.recoverResult = null;
+    this.setActivity({ id: 'recover', label: 'Recovering files', detail: 'Getting ready', route: 'recover' });
+    try {
+      const r = await bridge.win!.recoverRun(ids, folder);
+      this.recoverResult = r;
+      this.recoverSelected = new Set();
+      const saved = r.results.filter((x) => x.ok).length;
+      const text = `${saved} of ${r.results.length} files saved.`;
+      toast(text, saved === r.results.length ? 'good' : 'warning');
+      bridge.win?.notify('Recovery finished', text);
+    } catch (e) {
+      toast((e as Error).message, 'warning');
+    } finally {
+      this.recovering = false;
+      this.endActivity('recover');
+    }
   }
 
   // ---- app updates ----

@@ -78,6 +78,8 @@
 !macro customUnInstall
   ; An update also runs the uninstaller: keep the driver in that case.
   ${ifNot} ${isUpdated}
+    ; Put back the processor settings the user had before G Ultra changed them.
+    ExecWait '"$INSTDIR\resources\helper\GUltraHelper.exe" --restore-cpu'
     SetRegView 64
     ReadRegDWORD $0 HKLM "Software\G Ultra" "InstalledPawnIO"
     ${If} $0 == 1

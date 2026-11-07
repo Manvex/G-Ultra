@@ -8,6 +8,7 @@ import type { Sensor, SensorGroup } from '../lib/types';
 import { ChartLegend, LineChart, Sparkline, type Series } from '../ui/charts';
 import { Glass, PageHead, toast } from '../ui/kit';
 import { Liquid } from '../ui/Liquid';
+import { AppEfficiency, CpuCooling, CpuDiagnosis, OverclockCard, PhoneCooling } from './Cooling';
 import { FanPanel } from './Fans';
 import { PALETTE, ProcessRow } from './Home';
 import { requestElevation } from './Sheets';
@@ -207,7 +208,11 @@ export function Thermal() {
       </div>
 
       {!isAndroid && <SensorSetup hasCpuSensors={cpu != null} />}
+      {!isAndroid && <CpuDiagnosis />}
+      {!isAndroid && <CpuCooling />}
+      {!isAndroid && <OverclockCard />}
       {!isAndroid && <FanPanel />}
+      {isAndroid && <PhoneCooling />}
 
       {isAndroid && temps.filter((s) => s.group !== 'battery').length === 0 && (
         <Glass className="notice">
@@ -293,6 +298,7 @@ export function Thermal() {
               </div>
             </Glass>
           )}
+          {!isAndroid && <AppEfficiency processes={topCpu} />}
         </div>
       </div>
     </div>

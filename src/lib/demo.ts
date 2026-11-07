@@ -1,10 +1,20 @@
 // Made-up data, only for working on the UI in a browser. It never reaches the shipped apps:
 // bridge.ts loads it only when import.meta.env.DEV is true, and the UI shows a "Demo data" badge.
+import type { CpuTuningInfo } from './types';
 import type { Bridge } from './bridge';
 import type { GpuInfo, Live, ProcessItem } from './types';
 
 const GB = 1024 ** 3;
 const proc = (key: string, title: string, mem: number, cpu: number, critical = false): ProcessItem => ({ key, name: key, title, path: `C:\\Program Files\\${key}\\${key}.exe`, pids: [1], mem: mem * GB, cpu, disk: 0, critical, usageMs: mem * 3600000 });
+
+const demoTuning: CpuTuningInfo = {
+  mode: 'balanced',
+  boost: true,
+  maxAc: 100,
+  maxDc: 100,
+  coolingActive: true,
+  overclock: { status: 'unlocked', cpu: 'Demo CPU', tool: 'Intel XTU', url: 'https://www.intel.com', installed: false },
+};
 
 export function demoBridge(android: boolean): Bridge {
   let t = 0;
@@ -152,6 +162,21 @@ export function demoBridge(android: boolean): Bridge {
           cleanCancel: async () => ({}),
           setProgress: () => {},
           notify: () => {},
+          cpuTuning: async () => demoTuning,
+          cpuTuningMode: async () => demoTuning,
+          cpuTuningSet: async () => demoTuning,
+          overclockToolOpen: async () => ({}),
+          appEfficiencySet: async () => ({ changed: 1, failed: 0 }),
+          appEfficiencyState: async () => [],
+          gpuApps: async () => [{ pid: 1, name: 'Demo game', percent: 62 }],
+          pickFolder: async () => null,
+          binList: async () => [{ id: 'a', name: 'Demo photo.jpg', original: 'C:\\Users\\Demo\\Pictures\\Demo photo.jpg', size: 2400000, deletedMs: Date.now() - 86400000, isDir: false }],
+          binRestore: async () => [],
+          recoverDrives: async () => ({ drives: [{ letter: 'C', label: 'Windows', format: 'NTFS', total: 500e9, free: 120e9, ntfs: true }], elevated: true }),
+          recoverStart: async () => ({}),
+          recoverCancel: async () => ({}),
+          recoverList: async () => ({ total: 0, drive: 'C', items: [] }),
+          recoverRun: async () => ({ folder: '', results: [] }),
           driversScan: async () => ({ updates: [{ id: 'a', title: 'Demo driver update', provider: 'Maker', driverClass: 'Display', date: '2026-10-01', size: 500 * 1024 * 1024, needsTerms: false }], elevated: true }),
           driversInstalled: async () => ({ drivers: [{ name: 'Demo graphics card', group: 'Graphics', version: '32.0.1', provider: 'Maker', date: '2026-06-01' }], problems: [] }),
           driversInstall: async () => ({ restore: { state: 'created', message: 'Restore point created.' }, results: [], rebootRequired: false }),
@@ -184,6 +209,8 @@ export function demoBridge(android: boolean): Bridge {
           batterySet: async () => ({}),
           openSystemScreen: async () => ({}),
           requestNotifications: async () => ({}),
+          trashList: async () => ({ supported: true, items: [{ uri: 'content://media/demo', name: 'Demo photo.jpg', size: 2400000, expiresMs: Date.now() + 20 * 86400000 }] }),
+          trashRestore: async () => ({}),
           storage: async () => ({
             total: 128 * GB,
             free: 40 * GB,

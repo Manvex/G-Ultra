@@ -1107,6 +1107,71 @@ public class GUltraPlugin extends Plugin {
         call.resolve();
     }
 
+    // ---- phone trash ----
+    // Android only gives apps what's still in its trash. Permanently deleted files need root to reach.
+    private static Uri mediaUri(int type) {
+        switch (type) {
+            case MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE: return MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL);
+            case MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO: return MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL);
+            case MediaStore.Files.FileColumns.MEDIA_TYPE_AUDIO: return MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL);
+            default: return MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL);
+        }
+    }
+
+    @PluginMethod
+    public void trashList(PluginCall call) {
+        async(call, () -> {
+            JSObject o = new JSObject();
+            JSArray items = new JSArray();
+            boolean supported = Build.VERSION.SDK_INT >= 30;
+            o.put("supported", supported);
+            if (supported) {
+                Bundle query = new Bundle();
+                query.putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_ONLY);
+                query.putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER, MediaStore.MediaColumns.DATE_EXPIRES + " DESC");
+                String[] columns = {MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.DATE_EXPIRES, MediaStore.Files.FileColumns.MEDIA_TYPE};
+                try (Cursor cursor = getContext().getContentResolver().query(MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL), columns, query, null)) {
+                    while (cursor != null && cursor.moveToNext()) {
+                        JSObject item = new JSObject();
+                        item.put("uri", android.content.ContentUris.withAppendedId(mediaUri(cursor.getInt(4)), cursor.getLong(0)).toString());
+                        item.put("name", cursor.getString(1));
+                        item.put("size", cursor.getLong(2));
+                        item.put("expiresMs", cursor.getLong(3) * 1000);
+                        items.put(item);
+                    }
+                }
+            }
+            o.put("items", items);
+            return o;
+        });
+    }
+
+    @PluginMethod
+    public void trashRestore(PluginCall call) {
+        if (Build.VERSION.SDK_INT < 30) {
+            call.reject("This needs Android 11 or newer.");
+            return;
+        }
+        try {
+            JSArray uris = call.getArray("uris");
+            List<Uri> list = new ArrayList<>();
+            for (int i = 0; uris != null && i < uris.length(); i++) {
+                String uri = uris.getString(i);
+                if (uri.startsWith("content://media/")) list.add(Uri.parse(uri));
+            }
+            if (list.isEmpty()) {
+                call.reject("Nothing selected.");
+                return;
+            }
+            // Android asks the user to confirm, then moves the files out of its trash.
+            android.app.PendingIntent request = MediaStore.createTrashRequest(getContext().getContentResolver(), list, false);
+            getActivity().startIntentSenderForResult(request.getIntentSender(), 7310, null, 0, 0, 0);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject(e.getMessage() == null ? "Android refused the restore." : e.getMessage());
+        }
+    }
+
     // ---- app updates ----
     private static final String LATEST_RELEASE = "https://api.github.com/repos/Manvex/G-Ultra/releases/latest";
     private volatile String updateUrl;

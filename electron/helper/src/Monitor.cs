@@ -367,11 +367,23 @@ namespace GUltra
             return bytes >= (1L << 30) ? (bytes / (double)(1L << 30)).ToString("0.0", CultureInfo.InvariantCulture) + " GB" : (bytes / (1L << 20)) + " MB";
         }
 
+        static bool _ramArmed = true;
+
         static void RuleRam(int load, bool quiet)
         {
             var r = Section("ram");
-            if (!B(r, "enabled") || quiet || load < N(r, "threshold", 85)) return;
-            if (MinutesSince("ramAt") < N(r, "cooldownMin", 10)) return;
+            if (!B(r, "enabled") || quiet) return;
+            double limit = N(r, "threshold", 85);
+            if (load < limit - 3) _ramArmed = true;
+            if (load < limit) return;
+            // With the timer: at most once per wait. Without it: each time memory goes over the limit,
+            // but not again until it has come back down, or it would run on every check.
+            if (!r.ContainsKey("useTimer") || B(r, "useTimer"))
+            {
+                if (MinutesSince("ramAt") < N(r, "cooldownMin", 10)) return;
+            }
+            else if (!_ramArmed) return;
+            _ramArmed = false;
             Mark("ramAt");
             var res = (Dictionary<string, object>)MemoryCleaner.Free(B(r, "standby") && SystemInfo.IsElevated());
             int closed = B(r, "closeApps") ? CloseChosenApps() : 0;
@@ -426,6 +438,8 @@ namespace GUltra
         static void RuleTemp(double? cpuTemp)
         {
             var r = Section("temp");
+            bool coolMode = B(r, "coolMode");
+            if (!B(r, "enabled") || !coolMode) EndCoolRule();
             if (!B(r, "enabled") || !cpuTemp.HasValue)
             {
                 if (!B(r, "enabled")) RestoreCpuLimit(true);
@@ -437,7 +451,16 @@ namespace GUltra
                 _hotCount++;
                 _coolCount = 0;
                 if (_hotCount < 2) return;
-                bool limit = B(r, "limitCpu");
+                if (coolMode)
+                {
+                    if (StartCoolRule())
+                    {
+                        Log("temp", "Processor at " + Math.Round(cpuTemp.Value) + "°C. Cool mode is on until it cools down.", true);
+                        Mark("tempAt");
+                        return;
+                    }
+                }
+                bool limit = B(r, "limitCpu") && !coolMode;
                 if (limit && !_cpuLimited)
                 {
                     int[] old = BatteryService.GetCpuLimits();
@@ -463,7 +486,42 @@ namespace GUltra
             {
                 _hotCount = 0;
                 if (_cpuLimited && cpuTemp.Value < threshold - 8 && ++_coolCount >= 3) RestoreCpuLimit(true);
+                else if (coolMode && cpuTemp.Value < threshold - 8 && CoolRuleOn() && ++_coolCount >= 3)
+                {
+                    _coolCount = 0;
+                    EndCoolRule();
+                    Log("temp", "Temperature is back to normal. Cool mode is off.", false);
+                }
             }
+        }
+
+        static bool CoolRuleOn()
+        {
+            try { return CpuTuning.RuleCoolActive(); }
+            catch { return false; }
+        }
+
+        // True only when this call turned it on.
+        static bool StartCoolRule()
+        {
+            try
+            {
+                if (CpuTuning.RuleCoolActive()) return false;
+                CpuTuning.RuleCool(true);
+                return true;
+            }
+            catch { return false; }
+        }
+
+        static void EndCoolRule()
+        {
+            try { CpuTuning.RuleCool(false); }
+            catch { }
+        }
+
+        public static void ReleaseCpuLimit()
+        {
+            lock (Lock) RestoreCpuLimit(false);
         }
 
         static void RestoreCpuLimit(bool log)

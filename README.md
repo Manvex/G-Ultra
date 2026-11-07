@@ -24,19 +24,20 @@ Temperatures, RAM, disk wear, battery health, fans and cleanup in one dark, flui
 |---|---|
 | **Monitor** | Follow your system live, including from the background in a low-power mode, starting with your PC or phone. |
 | **Memory** | See RAM type, modules and usage, what's using it, how far you can upgrade, and the health of each module. Free up RAM in one tap. |
-| **Thermals** | Read temperatures and find out what's heating your CPU. |
+| **Thermals** | Read temperatures, find out what's heating your CPU, and lower them with Cool mode, a Turbo Boost switch, speed limits and efficiency mode for single apps. |
 | **Fans** | Set your own fan speeds, with safety limits that can't be turned off. |
-| **Graphics** | Adjust settings for your graphics card. |
+| **Graphics** | See what's using your graphics card and adjust its settings, including Cool and Maximum performance modes on NVIDIA cards. |
 | **Battery** | Check battery wear and use settings that save charge and extend its lifespan. Only appears on devices with a battery. |
 | **Storage** | See what's filling your drives. |
 | **Cleanup** | Remove caches and temporary files, without touching anything still in use. |
+| **Recover** | Restore files from the Recycle Bin, or scan a drive for deleted files. On Android, restore what's still in the system trash. |
 | **Health** | Check the wear on your SSD and other components. |
 | **Drivers** | See your drivers and any devices with a problem, and install updates from Windows Update. You choose what gets installed, and a restore point comes first. |
 | **Components** | List every part in your device, so you know what to buy when replacing one. |
 
 ### Automatic rules
 
-The background monitor can act for you. For example, it can free RAM when usage passes a level you choose, close the processes you pick every few minutes, or hold cooling at a set level.
+The background monitor can act for you. For example, it can free RAM when usage passes a level you choose, close the processes you pick every few minutes, switch to Cool mode when the processor gets hot, or hold cooling at a set level.
 
 Long jobs run in the background too, so you can keep using the app while a cleanup or scan finishes.
 
@@ -50,8 +51,11 @@ Long jobs run in the background too, so you can keep using the app while a clean
 | Battery | ✓ | ✓ |
 | Thermals | ✓ | ✓ |
 | Fan control | ✓ | |
+| CPU cooling modes | ✓ | |
 | Graphics settings | ✓ | |
 | Driver updates | ✓ | |
+| Recover from the trash | ✓ | ✓ |
+| Deep scan for deleted files | ✓ | |
 | In-app updates | ✓ | ✓ |
 
 What you can read depends on your hardware and on what each system allows apps to access, and Android is the more restricted of the two.
@@ -88,6 +92,14 @@ On Windows, it downloads the new version, installs it and restarts. On Android, 
 
 You can turn off the automatic check in Settings. The check contacts GitHub, and no data from your device is sent.
 
+## Recovering deleted files
+
+Deep scan reads an NTFS drive directly, without changing anything on it, and recovered files must go to a different drive so they can't overwrite what you're recovering. It needs administrator rights.
+
+It can't promise results. Files that have been overwritten are gone, and SSDs usually erase deleted files soon after, so it works best on hard drives and USB sticks. Compressed and encrypted files can't be rebuilt.
+
+On Android, no app can read permanently deleted files without root, so G Ultra restores what's still in the system trash and shows you other places to look.
+
 ## Built to be safe
 
 - **Cleanup can't be pointed elsewhere.** The interface only sends category names, and the paths to delete are fixed in [`Cleaner.cs`](electron/helper/src/Cleaner.cs).
@@ -95,6 +107,8 @@ You can turn off the automatic check in Settings. The check contacts GitHub, and
 - **Recent files stay.** Temp files newer than 24 hours and files in use are left alone.
 - **Critical processes stay running.** Critical Windows processes can't be closed from the app.
 - **Drivers come from one source.** Driver updates only come from Windows Update, and only the ones you choose are installed.
+- **CPU settings can be undone.** Cooling modes only use Windows power settings. Balanced puts back what you had, and so does uninstalling G Ultra.
+- **No direct overclocking.** G Ultra checks whether your processor can be overclocked and points you to the maker's own tool.
 - **Fans have limits.** They can't go below 30%, and they return to automatic at 90°C on the CPU or GPU and whenever the app closes.
 
 ## Build it yourself

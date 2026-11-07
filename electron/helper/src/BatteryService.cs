@@ -237,6 +237,33 @@ namespace GUltra
             return Math.Max(lo, Math.Min(hi, v));
         }
 
+        // ---- used by the CPU cooling settings ----
+        public static Guid ActivePlan()
+        {
+            return ActiveScheme();
+        }
+
+        public static void ActivatePlan()
+        {
+            Guid scheme = ActiveScheme();
+            PowerSetActiveScheme(IntPtr.Zero, ref scheme);
+        }
+
+        public static bool ReadProcessor(Guid plan, Guid setting, out uint ac, out uint dc)
+        {
+            ac = dc = 0;
+            Guid s = SubProcessor, g = setting;
+            return PowerReadACValueIndex(IntPtr.Zero, ref plan, ref s, ref g, out ac) == 0 && PowerReadDCValueIndex(IntPtr.Zero, ref plan, ref s, ref g, out dc) == 0;
+        }
+
+        public static void WriteProcessor(Guid plan, Guid setting, uint ac, uint dc)
+        {
+            Guid s = SubProcessor, g = setting;
+            uint st = PowerWriteACValueIndex(IntPtr.Zero, ref plan, ref s, ref g, ac);
+            if (st == 0) st = PowerWriteDCValueIndex(IntPtr.Zero, ref plan, ref s, ref g, dc);
+            if (st != 0) throw new Exception("Windows refused this power setting (code " + st + ").");
+        }
+
         // ---- used by the temperature and battery rules ----
         public static int[] GetCpuLimits()
         {
