@@ -18,6 +18,19 @@ Temperatures, RAM, disk wear, battery health, fans and cleanup in one dark, flui
 
 </div>
 
+## Screenshots
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/home.webp" alt="Home screen with live processor, memory, storage and temperature tiles"></td>
+    <td><img src="docs/screenshots/thermals.webp" alt="Thermals screen with temperature history and CPU cooling settings"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/memory.webp" alt="Memory screen with usage, installed modules and upgrade advice"></td>
+    <td><img src="docs/screenshots/components.webp" alt="Components screen listing the laptop, motherboard and processor"></td>
+  </tr>
+</table>
+
 ## What it does
 
 | | |
