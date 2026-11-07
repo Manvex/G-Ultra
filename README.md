@@ -99,9 +99,9 @@ To run in the background, Android requires a visible notification, and it may de
 
 ## Updates
 
-When a new version is out, G Ultra shows it at the top of the app. Press **Update**, and it does the rest.
+When a new version is out, a popup tells you, and on Windows you can also check with the button in the sidebar. Press **Update**, and it does the rest.
 
-On Windows, it downloads the new version, installs it and restarts. On Android, it downloads the new version and Android asks you to confirm the install.
+On Windows, it downloads the new version, shows a setup window while it installs, and reopens by itself. On Android, it downloads the new version and Android asks you to confirm the install.
 
 You can turn off the automatic check in Settings. The check contacts GitHub, and no data from your device is sent.
 

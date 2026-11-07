@@ -14,11 +14,18 @@ final class MonitorStore {
     private static final String PREFS = "gultra.monitor";
     private static final int MAX_EVENTS = 100;
     private static final long HISTORY_MS = 24 * 3600 * 1000L;
+    private static final long POINT_EVERY_MS = 5 * 60 * 1000L;
 
     private MonitorStore() {}
 
     private static SharedPreferences prefs(Context ctx) {
         return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
+
+    // In its own file: Android rewrites a whole preferences file on each save, and can make
+    // the app wait for that when it goes to the background.
+    private static SharedPreferences historyPrefs(Context ctx) {
+        return ctx.getSharedPreferences(PREFS + ".history", Context.MODE_PRIVATE);
     }
 
     private static JSONObject defaults() throws JSONException {
@@ -89,6 +96,8 @@ final class MonitorStore {
     static synchronized void addPoint(Context ctx, int mem, Double temp) {
         try {
             long now = System.currentTimeMillis();
+            if (prefs(ctx).contains("history")) prefs(ctx).edit().remove("history").apply();
+            if (now - historyPrefs(ctx).getLong("at", 0) < POINT_EVERY_MS) return;
             JSONArray history = history(ctx);
             JSONArray kept = new JSONArray();
             for (int i = 0; i < history.length(); i++) {
@@ -99,14 +108,14 @@ final class MonitorStore {
             point.put("cpu", JSONObject.NULL);
             point.put("temp", temp == null ? JSONObject.NULL : temp);
             kept.put(point);
-            prefs(ctx).edit().putString("history", kept.toString()).apply();
+            historyPrefs(ctx).edit().putString("history", kept.toString()).putLong("at", now).apply();
         } catch (JSONException ignored) {
         }
     }
 
     static synchronized JSONArray history(Context ctx) {
         try {
-            return new JSONArray(prefs(ctx).getString("history", "[]"));
+            return new JSONArray(historyPrefs(ctx).getString("history", "[]"));
         } catch (JSONException e) {
             return new JSONArray();
         }

@@ -15,8 +15,8 @@ import android.content.pm.ServiceInfo;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.IBinder;
-import android.os.Looper;
 import android.os.PowerManager;
 import android.os.storage.StorageManager;
 
@@ -38,7 +38,9 @@ public class MonitorService extends Service {
     private static final String CHANNEL_STATUS = "gultra.status";
     private static final String CHANNEL_ALERT = "gultra.alerts";
 
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    // The service shares a process with the app, so its work stays off the UI thread.
+    private HandlerThread thread;
+    private Handler handler;
     private final Runnable tick = this::tick;
     private boolean chargeAlerted = false;
 
@@ -53,6 +55,9 @@ public class MonitorService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        thread = new HandlerThread("gultra-monitor");
+        thread.start();
+        handler = new Handler(thread.getLooper());
         NotificationManager nm = getSystemService(NotificationManager.class);
         NotificationChannel status = new NotificationChannel(CHANNEL_STATUS, "Live status", NotificationManager.IMPORTANCE_MIN);
         status.setDescription("Memory, temperature and battery while G Ultra monitors in the background");
@@ -78,6 +83,7 @@ public class MonitorService extends Service {
     @Override
     public void onDestroy() {
         handler.removeCallbacks(tick);
+        thread.quitSafely();
         super.onDestroy();
     }
 

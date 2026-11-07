@@ -48,7 +48,7 @@ export function Liquid({ layers, energy = 0.2, bubbles = false, className }: Pro
 
     const resize = () => {
       const r = canvas.getBoundingClientRect();
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = Math.min(window.devicePixelRatio || 1, document.documentElement.dataset.platform === 'android' ? 1.5 : 2);
       w = r.width;
       h = r.height;
       canvas.width = Math.max(1, Math.round(w * dpr));
@@ -166,26 +166,26 @@ export function Liquid({ layers, energy = 0.2, bubbles = false, className }: Pro
     });
     io.observe(canvas);
 
-    let frozenAt = -1;
-    const unsub = subscribeFrame((t) => {
-      if (!visible) return;
-      if (!motionRef.current) {
-        // With animation off: redraw rarely, just to follow the data.
-        if (t - frozenAt < 1) return;
-        frozenAt = t;
-        phaseShift = 0;
-        draw(0);
-        return;
-      }
-      draw(t);
-    });
+    // With animation off: no frame loop at all, just a redraw now and then to follow the data.
+    let stopFrames = () => {};
+    if (motion) {
+      stopFrames = subscribeFrame((t) => {
+        if (visible) draw(t);
+      });
+    } else {
+      phaseShift = 0;
+      const timer = window.setInterval(() => {
+        if (visible && !document.hidden) draw(0);
+      }, 1000);
+      stopFrames = () => window.clearInterval(timer);
+    }
 
     return () => {
-      unsub();
+      stopFrames();
       ro.disconnect();
       io.disconnect();
     };
-  }, []);
+  }, [motion]);
 
   return <canvas ref={ref} className={`liquid ${className ?? ''}`} aria-hidden="true" />;
 }

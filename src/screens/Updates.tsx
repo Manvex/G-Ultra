@@ -1,9 +1,102 @@
-import { CircleArrowUp, Loader2 } from 'lucide-react';
+import { useEffect } from 'react';
+import { CircleArrowUp, Loader2, RefreshCw } from 'lucide-react';
 import { bridge } from '../lib/bridge';
 import { bytes } from '../lib/format';
 import { store, useSettings } from '../lib/store';
 import { useTasks } from '../lib/tasks';
-import { Glass, Switch } from '../ui/kit';
+import { Glass, SheetClose, Switch, openSheet } from '../ui/kit';
+
+function UpdateSheet({ close }: { close: () => void }) {
+  const t = useTasks();
+  const u = t.update;
+  if (!u) return null;
+  const failed = t.updateFailed || !!u.lastAttemptFailed;
+  return (
+    <>
+      <SheetClose onClose={close} />
+      <h2>Update available</h2>
+      <p>
+        G Ultra {u.version} is ready to install. You have version {u.current}.{u.size ? ` The download is ${bytes(u.size)}.` : ''}
+      </p>
+      <p>
+        {failed
+          ? "The last update didn't finish. Try again, or download it from GitHub."
+          : bridge.platform === 'android'
+            ? 'Android will ask you to confirm the install.'
+            : 'A setup window shows the progress, then G Ultra reopens by itself.'}
+      </p>
+      <div className="sheet-actions">
+        <button
+          className="btn"
+          onClick={() => {
+            t.dismissUpdate();
+            close();
+          }}
+        >
+          Later
+        </button>
+        {u.page && (
+          <button className="btn" onClick={() => bridge.openLink(u.page!)}>
+            {failed ? 'Download' : "What's new"}
+          </button>
+        )}
+        <button
+          className="btn primary"
+          onClick={() => {
+            t.showUpdateBanner();
+            close();
+            void t.installUpdate();
+          }}
+        >
+          Update
+        </button>
+      </div>
+    </>
+  );
+}
+
+const openUpdateSheet = () => openSheet((close) => <UpdateSheet close={close} />);
+
+// The popup shows once for each new version, however it was found.
+let announcedVersion: string | null = null;
+
+export function UpdatePopup() {
+  const t = useTasks();
+  const version = t.update?.available ? t.update.version : null;
+  useEffect(() => {
+    if (!version || version === announcedVersion || t.updateInstalling) return;
+    announcedVersion = version;
+    openUpdateSheet();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version]);
+  return null;
+}
+
+export function UpdateButton() {
+  const t = useTasks();
+  const u = t.update;
+  const available = !!u?.available;
+  const title = t.updateInstalling ? `Updating… ${t.updatePercent}%` : t.updateChecking ? 'Checking…' : available ? 'Update available' : 'Check for updates';
+  const detail = available ? `Version ${u!.version}` : `Version ${__APP_VERSION__}`;
+  const busy = t.updateInstalling || t.updateChecking;
+  return (
+    <button
+      className="mode-pill"
+      disabled={busy}
+      aria-label={title}
+      onClick={() => {
+        if (available) openUpdateSheet();
+        else void t.checkUpdate(true);
+      }}
+    >
+      {busy ? <Loader2 size={18} className="spin" style={{ flex: 'none' }} /> : available ? <CircleArrowUp size={18} color="var(--info)" style={{ flex: 'none' }} /> : <RefreshCw size={18} style={{ flex: 'none' }} />}
+      <div>
+        <strong>{title}</strong>
+        <span>{detail}</span>
+      </div>
+    </button>
+  );
+}
 
 // Appears above every screen when a new version is out.
 export function UpdateBanner() {
@@ -11,7 +104,13 @@ export function UpdateBanner() {
   const u = t.update;
   if (!u?.available || t.updateDismissed) return null;
   const isAndroid = bridge.platform === 'android';
-  const hint = isAndroid ? 'Android will ask you to confirm the install.' : "G Ultra restarts when it's done. Windows may ask you to confirm.";
+  const failed = t.updateFailed || !!u.lastAttemptFailed;
+  const hint = failed
+    ? "The last update didn't finish. Try again, or download it from GitHub."
+    : isAndroid
+      ? 'Android will ask you to confirm the install.'
+      : "A setup window shows the progress, then G Ultra reopens by itself. Windows may ask you to confirm.";
+  const progress = t.updatePercent >= 100 ? 'Starting the install…' : `Downloading… ${t.updatePercent}%`;
   return (
     <Glass className="notice" style={{ marginBottom: 14 }}>
       <div className="notice-icon" style={{ background: 'rgba(100,210,255,.14)' }}>
@@ -20,7 +119,7 @@ export function UpdateBanner() {
       <div className="grow">
         <div className="row-title">G Ultra {u.version} is available</div>
         <div className="row-sub" style={{ whiteSpace: 'normal' }}>
-          {t.updateInstalling ? `Downloading… ${t.updatePercent}%` : `${u.size ? `${bytes(u.size)}. ` : ''}${hint}`}
+          {t.updateInstalling ? progress : `${u.size ? `${bytes(u.size)}. ` : ''}${hint}`}
         </div>
       </div>
       {!t.updateInstalling && (
@@ -30,7 +129,7 @@ export function UpdateBanner() {
           </button>
           {u.page && (
             <button className="btn sm" onClick={() => bridge.openLink(u.page!)}>
-              What's new
+              {failed ? 'Download' : "What's new"}
             </button>
           )}
         </>

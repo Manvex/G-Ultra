@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { bridge } from './bridge';
 import type { Live, Sensor, SystemInfo } from './types';
 
@@ -18,10 +19,20 @@ interface Settings {
   autoUpdate: boolean;
 }
 
+const IS_PHONE = Capacitor.getPlatform() === 'android';
+
 function readSettings(): Settings {
-  const defaults: Settings = { motion: true, intervalMs: 1500, autoUpdate: true };
+  // Animations are heavy for phones, so they start off there. They can be turned on in Settings.
+  const defaults: Settings = { motion: !IS_PHONE, intervalMs: 1500, autoUpdate: true };
   try {
-    return { ...defaults, ...JSON.parse(localStorage.getItem('gultra.settings') || '{}') };
+    const saved = { ...defaults, ...JSON.parse(localStorage.getItem('gultra.settings') || '{}') };
+    // Phones that already had the app get the lighter default once.
+    if (IS_PHONE && !localStorage.getItem('gultra.phoneDefaults')) {
+      localStorage.setItem('gultra.phoneDefaults', '1');
+      saved.motion = false;
+      localStorage.setItem('gultra.settings', JSON.stringify(saved));
+    }
+    return saved;
   } catch {
     return defaults;
   }
@@ -72,7 +83,7 @@ class Store {
 
   private schedule() {
     if (this.timer != null) clearTimeout(this.timer);
-    this.timer = window.setTimeout(() => void this.tick(), this.settings.intervalMs);
+    this.timer = window.setTimeout(() => void this.tick(), IS_PHONE ? Math.max(3000, this.settings.intervalMs) : this.settings.intervalMs);
   }
 
   private async tick() {

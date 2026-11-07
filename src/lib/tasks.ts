@@ -67,6 +67,7 @@ class Tasks {
   updateInstalling = false;
   updatePercent = 0;
   updateDismissed = false;
+  updateFailed = false;
 
   private listeners = new Set<() => void>();
   private started = false;
@@ -490,10 +491,16 @@ class Tasks {
     this.emit();
   }
 
+  showUpdateBanner() {
+    this.updateDismissed = false;
+    this.emit();
+  }
+
   async installUpdate() {
     if (this.updateInstalling) return;
     this.updateInstalling = true;
     this.updatePercent = 0;
+    this.updateFailed = false;
     this.setActivity({ id: 'update', label: 'Updating G Ultra', detail: 'Downloading', route: 'home' });
     try {
       const r = await bridge.updateInstall((percent) => {
@@ -502,7 +509,8 @@ class Tasks {
       });
       if (r.needsPermission) toast('Allow G Ultra to install apps, then press Update again.', 'info');
     } catch {
-      toast("The update didn't finish. Check your internet connection and try again.", 'warning');
+      this.updateFailed = true;
+      toast("The update didn't finish. You can try again or download it from GitHub.", 'warning');
     } finally {
       this.updateInstalling = false;
       this.endActivity('update');

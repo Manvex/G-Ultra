@@ -1,7 +1,10 @@
 import { createRoot } from 'react-dom/client';
+import { Capacitor } from '@capacitor/core';
 import './styles.css';
 import { App } from './App';
 import { initBridge } from './lib/bridge';
+
+document.documentElement.dataset.platform = Capacitor.getPlatform();
 
 const root = createRoot(document.getElementById('root')!);
 

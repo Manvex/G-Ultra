@@ -9,6 +9,11 @@
   Pop $0
   ; Checked by default, and also what a silent install does.
   StrCpy $InstallDriver 1
+  ; A hidden update looks broken while it works, and its errors would go unseen, so it always shows
+  ; a window. This also covers older versions of the app, which ask for a silent install.
+  ${If} ${isUpdated}
+    SetSilent normal
+  ${EndIf}
 !macroend
 
 ; The sensor driver is optional, so it gets its own page, ticked by default.
@@ -16,6 +21,10 @@
   Page custom DriverPageShow DriverPageLeave
 
   Function DriverPageShow
+    ; An update keeps the choice made at install time.
+    ${If} ${isUpdated}
+      Abort
+    ${EndIf}
     !insertmacro MUI_HEADER_TEXT "Sensor driver" "Recommended, and most people should leave it on."
     nsDialogs::Create 1018
     Pop $0
@@ -37,6 +46,18 @@
       StrCpy $InstallDriver 0
     ${EndIf}
   FunctionEnd
+!macroend
+
+; The usual finish page, skipped during an update so it needs no extra click.
+!macro customFinishPage
+  Function StartApp
+    ${StdUtils.ExecShellAsUser} $0 "$launchLink" "open" ""
+  FunctionEnd
+
+  !define MUI_FINISHPAGE_RUN
+  !define MUI_FINISHPAGE_RUN_FUNCTION "StartApp"
+  !insertmacro skipPageIfUpdated
+  !insertmacro MUI_PAGE_FINISH
 !macroend
 
 !macro customUnInit
@@ -73,6 +94,13 @@
   ${EndIf}
   ${EndIf}
   SetRegView lastused
+
+  ; Nobody presses Finish during an update, so the app reopens from here. The installer already has
+  ; administrator rights, so this doesn't ask Windows for them again.
+  ${If} ${isUpdated}
+  ${AndIfNot} ${Silent}
+    Exec '"$appExe"'
+  ${EndIf}
 !macroend
 
 !macro customUnInstall

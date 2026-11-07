@@ -89,6 +89,22 @@ class Helper {
       this.child?.stdin.end();
     } catch {}
   }
+
+  // The installer can't replace the helper's files while it's still running.
+  stopAndWait(ms) {
+    return new Promise((resolve) => {
+      const child = this.child;
+      this.stop();
+      if (!child || child.exitCode !== null) return resolve();
+      child.once('exit', resolve);
+      setTimeout(resolve, ms);
+    });
+  }
+
+  resume() {
+    this.stopped = false;
+    if (!this.child || this.child.exitCode !== null) this.start();
+  }
 }
 
 // What the UI may ask for. Anything that decides which paths get deleted stays in the helper.
@@ -212,6 +228,25 @@ function installSensorDriver() {
 // New versions come from this project's GitHub releases. The download is checked against
 // the hash in the release's latest.yml before anything runs.
 let updater = null;
+let offeredVersion = null;
+
+const updateLog = (level, message) => {
+  try {
+    fs.appendFileSync(path.join(app.getPath('userData'), 'updater.log'), `${new Date().toISOString()} ${level} ${message}\n`);
+  } catch {}
+};
+
+// Remembers which version an update was going to, so the next launch can tell if it arrived.
+const attemptPath = () => path.join(app.getPath('userData'), 'update-attempt.json');
+
+function lastAttemptFailed(offered) {
+  try {
+    const { version } = JSON.parse(fs.readFileSync(attemptPath(), 'utf8'));
+    if (version === offered && version !== app.getVersion()) return true;
+    if (version === app.getVersion()) fs.unlinkSync(attemptPath());
+  } catch {}
+  return false;
+}
 
 function getUpdater() {
   if (!app.isPackaged) return null;
@@ -219,9 +254,13 @@ function getUpdater() {
     updater = require('electron-updater').autoUpdater;
     updater.autoDownload = false;
     updater.autoInstallOnAppQuit = false;
-    updater.logger = null;
-    // Every failure also rejects the call that caused it.
-    updater.on('error', () => {});
+    updater.logger = {
+      info: (m) => updateLog('info', m),
+      warn: (m) => updateLog('warn', m),
+      error: (m) => updateLog('error', m),
+      debug: () => {},
+    };
+    updater.on('error', (e) => updateLog('error', e?.stack ?? e));
     updater.on('download-progress', (p) => {
       if (win && !win.isDestroyed()) win.webContents.send('helper-event', 'updateProgress', { percent: Math.round(p.percent) });
     });
@@ -235,6 +274,7 @@ async function checkForUpdate() {
   if (!u) return { supported: false, available: false, current, version: null, size: null, page: null };
   const r = await u.checkForUpdates();
   const version = r?.updateInfo?.version ?? null;
+  offeredVersion = version;
   return {
     supported: true,
     available: !!r?.isUpdateAvailable,
@@ -242,6 +282,7 @@ async function checkForUpdate() {
     version,
     size: r?.updateInfo?.files?.[0]?.size ?? null,
     page: version ? `https://github.com/Manvex/G-Ultra/releases/tag/v${version}` : null,
+    lastAttemptFailed: lastAttemptFailed(version),
   };
 }
 
@@ -249,13 +290,28 @@ async function installUpdate() {
   const u = getUpdater();
   if (!u) throw new Error('Updates only work in the installed app.');
   await u.downloadUpdate();
-  // The installer force-closes the helper, so the fans go back to automatic first.
   try {
-    await Promise.race([helper.call('fanAutoAll'), new Promise((r) => setTimeout(r, 2000))]);
+    fs.writeFileSync(attemptPath(), JSON.stringify({ version: offeredVersion }));
   } catch {}
+  // Stopping the helper also hands the fans back to automatic.
+  await helper.stopAndWait(4000);
   relaunching = true;
-  setTimeout(() => u.quitAndInstall(true, true), 300);
-  return { started: true };
+
+  // Success ends this process, so the promise only ever settles if the installer didn't take over.
+  return new Promise((_resolve, reject) => {
+    let timer = 0;
+    const fail = (e) => {
+      clearTimeout(timer);
+      updater.removeListener('error', fail);
+      relaunching = false;
+      helper.resume();
+      updateLog('error', `install didn't start: ${e?.message ?? e}`);
+      reject(new Error('install-failed'));
+    };
+    updater.once('error', fail);
+    timer = setTimeout(() => fail(new Error('still running after starting the installer')), 20000);
+    u.quitAndInstall(false, false);
+  });
 }
 
 app.setAppUserModelId('com.gultra.app');

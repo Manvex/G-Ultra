@@ -61,6 +61,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Real data from the phone, in the same shape as the Windows helper.
@@ -70,6 +71,9 @@ import java.util.concurrent.Executors;
 public class GUltraPlugin extends Plugin {
 
     private final ExecutorService pool = Executors.newFixedThreadPool(3);
+    // Long jobs get their own threads, so they can't use up the pool or delay live data.
+    private final ExecutorService heavy = Executors.newSingleThreadExecutor();
+    private final ExecutorService readings = Executors.newSingleThreadExecutor();
     private final ConcurrentHashMap<String, String> iconCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> labelCache = new ConcurrentHashMap<>();
 
@@ -87,7 +91,15 @@ public class GUltraPlugin extends Plugin {
     }
 
     private void async(PluginCall call, Job job) {
-        pool.execute(() -> {
+        run(pool, call, job);
+    }
+
+    private void asyncHeavy(PluginCall call, Job job) {
+        run(heavy, call, job);
+    }
+
+    private void run(ExecutorService where, PluginCall call, Job job) {
+        where.execute(() -> {
             try {
                 call.resolve(job.run());
             } catch (Exception e) {
@@ -262,20 +274,40 @@ public class GUltraPlugin extends Plugin {
     }
 
     // ---- temperatures ----
-    private long sensorsAt = 0;
-    private JSArray sensorsCache = new JSArray();
+    private volatile long sensorsAt = 0;
+    private volatile JSArray sensorsCache = null;
+    private final AtomicBoolean sensorsBusy = new AtomicBoolean(false);
 
-    private synchronized JSArray sensors() throws Exception {
+    // Reading a thermal zone can take a long time on some phones, so live data never waits for it.
+    private JSArray sensors() {
         long now = SystemClock.elapsedRealtime();
-        if (now - sensorsAt < 2500 && sensorsCache.length() > 0) return sensorsCache;
-        sensorsAt = now;
-        JSArray list = new JSArray();
+        if ((sensorsCache == null || now - sensorsAt >= 10000) && sensorsBusy.compareAndSet(false, true)) {
+            readings.execute(() -> {
+                try {
+                    sensorsCache = readSensors();
+                    sensorsAt = SystemClock.elapsedRealtime();
+                } catch (Exception ignored) {
+                } finally {
+                    sensorsBusy.set(false);
+                }
+            });
+        }
+        JSArray known = sensorsCache;
+        return known != null ? known : batterySensor();
+    }
 
+    private JSArray batterySensor() {
+        JSArray list = new JSArray();
         Intent b = batteryIntent();
         if (b != null) {
             int t = b.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Integer.MIN_VALUE);
             if (t != Integer.MIN_VALUE && t > 0) list.put(sensor("battery", "Battery", "battery", t / 10.0));
         }
+        return list;
+    }
+
+    private JSArray readSensors() {
+        JSArray list = batterySensor();
 
         // On many Android 12+ phones SELinux blocks these files, which leaves only the battery.
         File[] zones = new File("/sys/class/thermal").listFiles((d, name) -> name.startsWith("thermal_zone"));
@@ -298,7 +330,6 @@ public class GUltraPlugin extends Plugin {
                 list.put(sensor("zone:" + f[0], zoneName(f[0]), zoneGroup(f[0]), Math.round(Double.parseDouble(f[1]) * 10) / 10.0));
             }
         }
-        sensorsCache = list;
         return list;
     }
 
@@ -329,18 +360,28 @@ public class GUltraPlugin extends Plugin {
     }
 
     // ---- recently used apps ----
-    private long appsAt = 0;
-    private JSArray appsCache = new JSArray();
+    private volatile long appsAt = 0;
+    private volatile JSArray appsCache = new JSArray();
+    private final AtomicBoolean appsBusy = new AtomicBoolean(false);
 
-    private synchronized JSArray recentApps() {
+    private JSArray recentApps() {
         long now = SystemClock.elapsedRealtime();
-        if (now - appsAt < 20000 && appsAt != 0) return appsCache;
-        appsAt = now;
-        JSArray list = new JSArray();
-        if (!hasUsageAccess()) {
-            appsCache = list;
-            return list;
+        if ((appsAt == 0 || now - appsAt >= 30000) && appsBusy.compareAndSet(false, true)) {
+            readings.execute(() -> {
+                try {
+                    appsCache = readRecentApps();
+                    appsAt = SystemClock.elapsedRealtime();
+                } finally {
+                    appsBusy.set(false);
+                }
+            });
         }
+        return appsCache;
+    }
+
+    private JSArray readRecentApps() {
+        JSArray list = new JSArray();
+        if (!hasUsageAccess()) return list;
         try {
             Context ctx = getContext();
             UsageStatsManager usm = ctx.getSystemService(UsageStatsManager.class);
@@ -376,7 +417,6 @@ public class GUltraPlugin extends Plugin {
         } catch (Exception ignored) {
             // The list stays empty and the UI asks for the permission.
         }
-        appsCache = list;
         return list;
     }
 
@@ -550,15 +590,15 @@ public class GUltraPlugin extends Plugin {
 
     @PluginMethod
     public void storage(PluginCall call) {
-        async(call, () -> buildStorage());
+        asyncHeavy(call, this::buildStorage);
     }
 
-    private synchronized JSObject buildStorage() throws Exception {
+    private JSObject buildStorage() throws Exception {
         long now = SystemClock.elapsedRealtime();
         boolean usage = hasUsageAccess();
         boolean files = hasAllFiles();
         // Permissions can change between calls, so the cache takes them into account.
-        if (storageCache != null && now - storageAt < 20000
+        if (storageCache != null && now - storageAt < 60000
             && storageCache.getBool("usageAccess") == usage && storageCache.getBool("allFiles") == files) {
             return storageCache;
         }
@@ -1037,7 +1077,7 @@ public class GUltraPlugin extends Plugin {
     // ---- components ----
     @PluginMethod
     public void components(PluginCall call) {
-        async(call, () -> {
+        asyncHeavy(call, () -> {
             String detected = detectRamType();
             return DeviceInventory.build(getContext(), batteryHealth(), detected != null ? detected : "LPDDR");
         });
@@ -1046,20 +1086,22 @@ public class GUltraPlugin extends Plugin {
     // ---- background monitor ----
     @PluginMethod
     public void monitorGet(PluginCall call) {
-        Context ctx = getContext();
-        org.json.JSONObject cfg = MonitorStore.config(ctx);
-        org.json.JSONArray events = MonitorStore.events(ctx);
-        JSArray recent = new JSArray();
-        for (int i = events.length() - 1; i >= 0 && recent.length() < 40; i--) recent.put(events.opt(i));
-        JSObject o = new JSObject();
-        o.put("config", cfg);
-        o.put("running", cfg.optBoolean("enabled", true));
-        o.put("autostart", cfg.optBoolean("startWithSystem", true));
-        o.put("elevated", false);
-        o.put("events", recent);
-        o.put("canCloseApps", Build.VERSION.SDK_INT < 34);
-        o.put("notificationsAllowed", androidx.core.app.NotificationManagerCompat.from(ctx).areNotificationsEnabled());
-        call.resolve(o);
+        async(call, () -> {
+            Context ctx = getContext();
+            org.json.JSONObject cfg = MonitorStore.config(ctx);
+            org.json.JSONArray events = MonitorStore.events(ctx);
+            JSArray recent = new JSArray();
+            for (int i = events.length() - 1; i >= 0 && recent.length() < 40; i--) recent.put(events.opt(i));
+            JSObject o = new JSObject();
+            o.put("config", cfg);
+            o.put("running", cfg.optBoolean("enabled", true));
+            o.put("autostart", cfg.optBoolean("startWithSystem", true));
+            o.put("elevated", false);
+            o.put("events", recent);
+            o.put("canCloseApps", Build.VERSION.SDK_INT < 34);
+            o.put("notificationsAllowed", androidx.core.app.NotificationManagerCompat.from(ctx).areNotificationsEnabled());
+            return o;
+        });
     }
 
     @PluginMethod
@@ -1081,9 +1123,11 @@ public class GUltraPlugin extends Plugin {
 
     @PluginMethod
     public void monitorHistory(PluginCall call) {
-        JSObject o = new JSObject();
-        o.put("points", MonitorStore.history(getContext()));
-        call.resolve(o);
+        async(call, () -> {
+            JSObject o = new JSObject();
+            o.put("points", MonitorStore.history(getContext()));
+            return o;
+        });
     }
 
     @PluginMethod

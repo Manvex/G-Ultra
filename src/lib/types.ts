@@ -536,6 +536,7 @@ export interface UpdateInfo {
   version: string | null;
   size: number | null;
   page: string | null;
+  lastAttemptFailed?: boolean;
 }
 
 export interface UpdateStart {

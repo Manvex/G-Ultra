@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArchiveRestore, BatteryMedium, CircuitBoard, Gpu, HardDrive, HeartPulse, House, Loader2, PackageCheck, MemoryStick, Minus, Radar, Settings, ShieldAlert, ShieldCheck, Sparkles, Square, Thermometer, X, type LucideIcon } from 'lucide-react';
+import { ArchiveRestore, BatteryMedium, CircuitBoard, Gpu, HardDrive, HeartPulse, House, Loader2, PackageCheck, MemoryStick, Minus, Radar, Settings, ShieldAlert, Sparkles, Square, Thermometer, X, type LucideIcon } from 'lucide-react';
 import logo from './assets/logo.png';
 import { bridge } from './lib/bridge';
 import { shortDevice } from './lib/format';
@@ -21,7 +21,7 @@ import { Drivers } from './screens/Drivers';
 import { ElevateSheet, SettingsSheet } from './screens/Sheets';
 import { Storage } from './screens/Storage';
 import { Thermal } from './screens/Thermal';
-import { UpdateBanner } from './screens/Updates';
+import { UpdateBanner, UpdateButton, UpdatePopup } from './screens/Updates';
 
 export type Route = RouteId;
 
@@ -106,7 +106,8 @@ function Nav({ route, routes, onNav }: { route: Route; routes: { id: Route; labe
       st.h = el.offsetHeight;
       d.style.width = `${st.w}px`;
       d.style.height = `${st.h}px`;
-      if (st.w !== st.lensW || st.h !== st.lensH) {
+      // The lens is a filter recomputed on every frame, which phones can't keep up with.
+      if (bridge.platform !== 'android' && (st.w !== st.lensW || st.h !== st.lensH)) {
         st.lensW = st.w;
         st.lensH = st.h;
         const radius = parseFloat(getComputedStyle(d).borderTopLeftRadius) || 15;
@@ -233,7 +234,8 @@ export function App() {
 
   return (
     <div className="app" data-motion={settings.motion ? 'on' : 'off'}>
-      <FluidBackground motion={settings.motion} />
+      {(!isAndroid || settings.motion) && <FluidBackground motion={settings.motion} />}
+      <UpdatePopup />
       {hasWindowControls && <div className="drag" />}
       {hasWindowControls && <WindowControls />}
 
@@ -250,24 +252,16 @@ export function App() {
           <div className="activity-side">
             <ActivityList onNav={nav} />
           </div>
-          {hasWindowControls &&
-            (elevated ? (
-              <div className="mode-pill">
-                <ShieldCheck size={18} color="var(--good)" style={{ flex: 'none' }} />
-                <div>
-                  <strong>Full mode</strong>
-                  <span>Running as administrator</span>
-                </div>
+          {hasWindowControls && !elevated && (
+            <button className="mode-pill" onClick={() => openSheet((close) => <ElevateSheet close={close} />)} aria-label="Turn on full mode">
+              <ShieldAlert size={18} color="var(--warning)" style={{ flex: 'none' }} />
+              <div>
+                <strong>Limited mode</strong>
+                <span>Tap for full mode</span>
               </div>
-            ) : (
-              <button className="mode-pill" onClick={() => openSheet((close) => <ElevateSheet close={close} />)} aria-label="Turn on full mode">
-                <ShieldAlert size={18} color="var(--warning)" style={{ flex: 'none' }} />
-                <div>
-                  <strong>Limited mode</strong>
-                  <span>Tap for full mode</span>
-                </div>
-              </button>
-            ))}
+            </button>
+          )}
+          {hasWindowControls && <UpdateButton />}
           <button className="mode-pill" onClick={() => openSheet((close) => <SettingsSheet close={close} />)} aria-label="Settings">
             <Settings size={18} style={{ flex: 'none' }} />
             <div>

@@ -50,27 +50,29 @@ export function SettingsSheet({ close }: { close: () => void }) {
           <div className="grow">
             <div className="row-title">Fluid animations</div>
             <div className="row-sub" style={{ whiteSpace: 'normal' }}>
-              The background and liquid use a little CPU. You can freeze them.
+              {bridge.platform === 'android' ? 'Off by default, because they can make phones slower and use more battery.' : 'The background and liquid use a little CPU. You can freeze them.'}
             </div>
           </div>
           <Switch checked={settings.motion} onChange={(motion) => store.setSettings({ motion })} label="Fluid animations" />
         </div>
-        <div className="list-row">
-          <div className="grow">
-            <div className="row-title">Refresh rate</div>
-            <div className="row-sub">How often sensors are read</div>
+        {bridge.platform !== 'android' && (
+          <div className="list-row">
+            <div className="grow">
+              <div className="row-title">Refresh rate</div>
+              <div className="row-sub">How often sensors are read</div>
+            </div>
+            <Segmented
+              label="Refresh rate"
+              value={String(settings.intervalMs)}
+              options={[
+                { value: '1000', label: '1 s' },
+                { value: '1500', label: '1.5 s' },
+                { value: '3000', label: '3 s' },
+              ]}
+              onChange={(v) => store.setSettings({ intervalMs: Number(v) })}
+            />
           </div>
-          <Segmented
-            label="Refresh rate"
-            value={String(settings.intervalMs)}
-            options={[
-              { value: '1000', label: '1 s' },
-              { value: '1500', label: '1.5 s' },
-              { value: '3000', label: '3 s' },
-            ]}
-            onChange={(v) => store.setSettings({ intervalMs: Number(v) })}
-          />
-        </div>
+        )}
         <UpdateSettings />
       </div>
     </>

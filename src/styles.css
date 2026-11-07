@@ -1888,6 +1888,46 @@ button.list-row:hover .row-chev {
   }
 }
 
+/* ---- phones ----
+   A WebView has to recompute masks, large shadows and blurs for every scrolled frame,
+   so on Android the glass stays flat and looks the same at rest. */
+[data-platform='android'] * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+[data-platform='android'] .glass {
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+  isolation: auto;
+}
+
+[data-platform='android'] .glass::before,
+[data-platform='android'] .glass::after {
+  display: none;
+}
+
+[data-platform='android'] .sidebar {
+  background: #1b1d24;
+}
+
+[data-platform='android'] .droplet {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+}
+
+[data-platform='android'] .scrim {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+[data-platform='android'] .toast {
+  background: #24262e;
+}
+
+[data-platform='android'] .page {
+  animation: none;
+}
+
 /* ---- reduced motion ---- */
 [data-motion='off'] *,
 [data-motion='off'] *::before,
