@@ -2,8 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- No INTERNET: G Ultra sends nothing off the phone. -->
-    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <!-- Only for checking for and downloading G Ultra's own updates. No phone data is sent. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Stops background processes (only has an effect up to Android 13). -->
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />

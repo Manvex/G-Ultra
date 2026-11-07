@@ -1,7 +1,7 @@
 {
   "name": "g-ultra",
   "productName": "G Ultra",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "G Ultra: system monitoring and optimization for Windows and Android",
   "author": "G Ultra",
   "license": "GPL-3.0-only",
@@ -17,7 +17,8 @@
     "start": "npm run build:web && electron .",
     "dist:win": "npm run build:helper && npm run build:web && electron-builder --win --x64",
     "dist:android": "npm run build:web && npx cap sync android && node scripts/build-apk.mjs",
-    "setup": "node scripts/fetch-lhm.mjs && node scripts/fetch-drivers.mjs"
+    "setup": "node scripts/fetch-lhm.mjs && node scripts/fetch-drivers.mjs",
+    "release": "node scripts/publish-release.mjs"
   },
   "build": {
     "appId": "com.gultra.app",
@@ -74,7 +75,7 @@
       "createStartMenuShortcut": true,
       "runAfterFinish": true,
       "shortcutName": "G Ultra",
-      "artifactName": "G-Ultra-Setup-${version}.${ext}",
+      "artifactName": "G-Ultra-Setup.${ext}",
       "include": "build/installer.nsh",
       "installerLanguages": [
         "en_US"
@@ -85,12 +86,20 @@
     "npmRebuild": false,
     "electronLanguages": [
       "en-US"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Manvex",
+        "repo": "G-Ultra"
+      }
     ]
   },
   "dependencies": {
     "@capacitor/android": "^8.6.0",
     "@capacitor/core": "^8.6.0",
     "@fontsource-variable/inter": "^5.3.0",
+    "electron-updater": "^6.8.11",
     "lucide-react": "^1.70.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

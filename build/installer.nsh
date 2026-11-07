@@ -60,6 +60,8 @@
 
   ; PawnIO is the signed sensor driver behind CPU temperatures and fan control.
   ; Remember whether this installer added it, so uninstalling only removes what it put there.
+  ; An app update leaves the driver as it is, including when the user chose not to have it.
+  ${ifNot} ${isUpdated}
   ${If} $InstallDriver == 1
   ReadRegStr $2 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO" "DisplayVersion"
   ${If} $2 == ""
@@ -68,6 +70,7 @@
   DetailPrint "Installing the sensor driver (PawnIO)..."
   ExecWait '"$INSTDIR\resources\drivers\PawnIO_setup.exe" -install -silent' $3
   DetailPrint "Sensor driver setup finished with code $3"
+  ${EndIf}
   ${EndIf}
   SetRegView lastused
 !macroend

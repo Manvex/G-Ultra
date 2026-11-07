@@ -8,11 +8,14 @@ import type {
   CleanScanResult,
   ComponentsData,
   DisksInfo,
+  DriverInstallResult,
+  DriverScan,
   EndResult,
   FreeRamResult,
   GpuInfo,
   HealthData,
   HistoryPoint,
+  InstalledDrivers,
   Live,
   MemoryDetails,
   MonitorConfig,
@@ -22,6 +25,8 @@ import type {
   ScanNode,
   StartupApp,
   SystemInfo,
+  UpdateInfo,
+  UpdateStart,
   WindowsBatteryInfo,
 } from './types';
 
@@ -51,6 +56,9 @@ export interface WindowsApi {
   ramTestStart(): Promise<unknown>;
   ramTestCancel(): Promise<unknown>;
   ramDiagnostic(): Promise<unknown>;
+  driversScan(): Promise<DriverScan>;
+  driversInstalled(): Promise<InstalledDrivers>;
+  driversInstall(ids: string[], allowNoRestorePoint: boolean): Promise<DriverInstallResult>;
 }
 
 export interface AndroidApi {
@@ -94,17 +102,22 @@ export interface Bridge {
   monitorSet(config: MonitorConfig): Promise<unknown>;
   monitorHistory(): Promise<HistoryPoint[]>;
   setAutostart(on: boolean): Promise<unknown>;
+  updateCheck(): Promise<UpdateInfo>;
+  updateInstall(onProgress: (percent: number) => void): Promise<UpdateStart>;
   win?: WindowsApi;
   android?: AndroidApi;
 }
 
 declare global {
+  const __APP_VERSION__: string;
   interface Window {
     gultraNative?: {
       rpc(method: string, params?: unknown): Promise<any>;
       window(action: string): Promise<void>;
       elevate(): Promise<{ ok: boolean }>;
       installDriver(): Promise<{ ok: boolean; code: number }>;
+      updateCheck(): Promise<UpdateInfo>;
+      updateInstall(): Promise<UpdateStart>;
       reveal(path: string): Promise<void>;
       trash(path: string): Promise<boolean>;
       openLink(url: string): Promise<void>;
@@ -142,6 +155,13 @@ function windowsBridge(): Bridge {
     monitorSet: (config) => n.rpc('monitorSet', { config }),
     monitorHistory: () => n.rpc('monitorHistory'),
     setAutostart: (on) => n.rpc('autostartSet', { on }),
+    updateCheck: () => n.updateCheck(),
+    updateInstall: (onProgress) => {
+      const off = n.onEvent((name, data) => {
+        if (name === 'updateProgress') onProgress(data.percent);
+      });
+      return n.updateInstall().finally(off);
+    },
     win: {
       elevate: () => n.elevate(),
       installDriver: () => n.installDriver(),
@@ -168,6 +188,9 @@ function windowsBridge(): Bridge {
       ramTestStart: () => n.rpc('ramTestStart'),
       ramTestCancel: () => n.rpc('ramTestCancel'),
       ramDiagnostic: () => n.rpc('ramDiagnostic'),
+      driversScan: () => n.rpc('driversScan'),
+      driversInstalled: () => n.rpc('driversInstalled'),
+      driversInstall: (ids, allowNoRestorePoint) => n.rpc('driversInstall', { ids, allowNoRestorePoint }),
     },
   };
 }
@@ -199,6 +222,9 @@ interface GUltraPlugin {
   monitorHistory(): Promise<{ points: HistoryPoint[] }>;
   monitorAutostart(o: { on: boolean }): Promise<any>;
   requestNotifications(): Promise<any>;
+  updateCheck(): Promise<UpdateInfo>;
+  updateInstall(): Promise<UpdateStart>;
+  addListener(name: 'updateProgress', cb: (d: { percent: number }) => void): Promise<{ remove(): Promise<void> }>;
 }
 
 // Android has no public way to name the GPU, but WebGL reports it.
@@ -262,6 +288,15 @@ function androidBridge(): Bridge {
     monitorSet: (config) => p.monitorSet({ config }),
     monitorHistory: () => p.monitorHistory().then((r) => r.points),
     setAutostart: (on) => p.monitorAutostart({ on }),
+    updateCheck: () => p.updateCheck(),
+    updateInstall: async (onProgress) => {
+      const listener = await p.addListener('updateProgress', (d) => onProgress(d.percent));
+      try {
+        return await p.updateInstall();
+      } finally {
+        void listener.remove();
+      }
+    },
     android: {
       permissions: () => p.permissions(),
       requestUsageAccess: () => p.requestUsageAccess(),

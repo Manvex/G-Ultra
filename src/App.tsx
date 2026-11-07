@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { BatteryMedium, CircuitBoard, Gpu, HardDrive, HeartPulse, House, Loader2, MemoryStick, Minus, Radar, Settings, ShieldAlert, ShieldCheck, Sparkles, Square, Thermometer, X, type LucideIcon } from 'lucide-react';
+import { BatteryMedium, CircuitBoard, Gpu, HardDrive, HeartPulse, House, Loader2, PackageCheck, MemoryStick, Minus, Radar, Settings, ShieldAlert, ShieldCheck, Sparkles, Square, Thermometer, X, type LucideIcon } from 'lucide-react';
 import logo from './assets/logo.png';
 import { bridge } from './lib/bridge';
 import { shortDevice } from './lib/format';
@@ -16,9 +16,11 @@ import { Health } from './screens/Health';
 import { Home } from './screens/Home';
 import { Memory } from './screens/Memory';
 import { Monitor } from './screens/Monitor';
+import { Drivers } from './screens/Drivers';
 import { ElevateSheet, SettingsSheet } from './screens/Sheets';
 import { Storage } from './screens/Storage';
 import { Thermal } from './screens/Thermal';
+import { UpdateBanner } from './screens/Updates';
 
 export type Route = RouteId;
 
@@ -33,6 +35,7 @@ function routesFor(isAndroid: boolean, hasBattery: boolean): { id: Route; label:
     { id: 'storage', label: 'Storage', icon: HardDrive },
     { id: 'clean', label: 'Cleanup', icon: Sparkles },
     { id: 'health', label: 'Health', icon: HeartPulse },
+    ...(isAndroid ? [] : [{ id: 'drivers' as Route, label: 'Drivers', icon: PackageCheck }]),
     { id: 'components', label: 'Components', icon: CircuitBoard },
   ];
 }
@@ -275,6 +278,7 @@ export function App() {
       <main className="content">
         <div className="scroll" ref={scrollRef}>
           <div className="page" key={route}>
+            <UpdateBanner />
             {route === 'home' && <Home nav={nav} />}
             {route === 'monitor' && <Monitor />}
             {route === 'memory' && <Memory />}
@@ -284,6 +288,7 @@ export function App() {
             {route === 'storage' && <Storage />}
             {route === 'clean' && <Clean />}
             {route === 'health' && <Health />}
+            {route === 'drivers' && <Drivers />}
             {route === 'components' && <Components />}
           </div>
         </div>

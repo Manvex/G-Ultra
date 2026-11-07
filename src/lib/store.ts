@@ -15,10 +15,11 @@ export interface History {
 interface Settings {
   motion: boolean;
   intervalMs: number;
+  autoUpdate: boolean;
 }
 
 function readSettings(): Settings {
-  const defaults: Settings = { motion: true, intervalMs: 1500 };
+  const defaults: Settings = { motion: true, intervalMs: 1500, autoUpdate: true };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem('gultra.settings') || '{}') };
   } catch {

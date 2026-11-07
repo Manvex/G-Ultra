@@ -2,10 +2,10 @@ import { useSyncExternalStore } from 'react';
 import { bridge } from './bridge';
 import { bytes, int, plural } from './format';
 import { loadData, store } from './store';
-import type { CleanCategory, CleanRunResult, FreeRamResult, RamTestState, ScanNode, ScanProgress } from './types';
+import type { CleanCategory, CleanRunResult, DriverInstallResult, DriverScan, FreeRamResult, RamTestState, ScanNode, ScanProgress, UpdateInfo } from './types';
 import { toast } from '../ui/kit';
 
-export type RouteId = 'home' | 'monitor' | 'memory' | 'thermal' | 'gpu' | 'battery' | 'storage' | 'clean' | 'health' | 'components';
+export type RouteId = 'home' | 'monitor' | 'memory' | 'thermal' | 'gpu' | 'battery' | 'storage' | 'clean' | 'health' | 'drivers' | 'components';
 
 export interface Activity {
   id: string;
@@ -40,6 +40,22 @@ class Tasks {
   freeingRam = false;
   ramResult: FreeRamResult | null = null;
   ramTest: RamTestState | null = null;
+
+  // Drivers
+  driverScan: DriverScan | null = null;
+  driverError: string | null = null;
+  driversChecking = false;
+  driversInstalling = false;
+  driverResult: DriverInstallResult | null = null;
+  driverConfirm: { ids: string[]; message: string } | null = null;
+  private driverChoice: Set<string> | null = null;
+
+  // App updates
+  update: UpdateInfo | null = null;
+  updateChecking = false;
+  updateInstalling = false;
+  updatePercent = 0;
+  updateDismissed = false;
 
   private listeners = new Set<() => void>();
   private started = false;
@@ -97,6 +113,8 @@ class Tasks {
         this.setActivity({ id: 'clean', label: 'Cleaning up', detail: `${data.name} · ${bytes(data.freed)} freed`, route: 'clean' });
       } else if (name === 'ramTest') {
         this.onRamTest(data);
+      } else if (name === 'driverInstall') {
+        this.onDriverInstall(data);
       } else if (name === 'monitorEvent') {
         toast(data.text, 'info');
         bridge.win?.notify('G Ultra', data.text);
@@ -106,6 +124,12 @@ class Tasks {
         bridge.win?.notify('Fans back on automatic', `The system reached ${Math.round(data.celsius)}°C.`);
       }
     });
+    // Soon after opening, then every 6 hours. The setting can change at any time.
+    const autoCheck = () => {
+      if (store.settings.autoUpdate) void this.checkUpdate(false);
+    };
+    window.setTimeout(autoCheck, 8000);
+    window.setInterval(autoCheck, 6 * 60 * 60 * 1000);
   }
 
   // ---- storage analysis ----
@@ -268,6 +292,128 @@ class Tasks {
       void loadData('ramHealth', () => bridge.win!.ramHealth());
     } else if (data.state === 'failed') {
       toast(`The memory test stopped: ${data.message}`, 'warning');
+    }
+  }
+
+  // ---- drivers ----
+  checkDrivers() {
+    if (this.driversChecking) return;
+    this.driversChecking = true;
+    this.driverError = null;
+    this.setActivity({ id: 'driversCheck', label: 'Checking for driver updates', route: 'drivers' });
+    void bridge
+      .win!.driversScan()
+      .then((r) => {
+        this.driverScan = r;
+        this.driverChoice = null;
+      })
+      .catch((e: Error) => {
+        this.driverScan = null;
+        this.driverError = e.message;
+      })
+      .finally(() => {
+        this.driversChecking = false;
+        this.endActivity('driversCheck');
+      });
+  }
+
+  /** By default, every driver that can be installed from here. */
+  driverSelected(): Set<string> {
+    return this.driverChoice ?? new Set(this.driverScan?.updates.filter((u) => !u.needsTerms).map((u) => u.id) ?? []);
+  }
+
+  toggleDriver(id: string, on: boolean) {
+    const next = new Set(this.driverSelected());
+    if (on) next.add(id);
+    else next.delete(id);
+    this.driverChoice = next;
+    this.emit();
+  }
+
+  cancelDriverConfirm() {
+    this.driverConfirm = null;
+    this.emit();
+  }
+
+  async installDrivers(ids: string[], allowNoRestorePoint = false) {
+    if (this.driversInstalling) return;
+    this.driversInstalling = true;
+    this.driverConfirm = null;
+    this.driverResult = null;
+    this.setActivity({ id: 'driversInstall', label: 'Installing drivers', detail: 'Getting ready', route: 'drivers' });
+    let finished = false;
+    try {
+      const r = await bridge.win!.driversInstall(ids, allowNoRestorePoint);
+      if (r.needsConfirm) {
+        this.driverConfirm = { ids, message: r.restore.message };
+      } else {
+        this.driverResult = r;
+        finished = true;
+        const failed = r.results.filter((x) => x.state !== 'installed').length;
+        const text = r.rebootRequired ? 'Drivers installed. Restart your PC to finish.' : failed ? `Finished, but ${plural(failed, 'driver', 'drivers')} didn't install.` : 'Drivers installed.';
+        toast(text, failed ? 'warning' : 'good');
+        bridge.win?.notify('Driver updates finished', text);
+      }
+    } catch (e) {
+      toast(`Drivers weren't installed: ${(e as Error).message}`, 'warning');
+    } finally {
+      this.driversInstalling = false;
+      this.endActivity('driversInstall');
+    }
+    if (finished) {
+      void loadData('driversInstalled', () => bridge.win!.driversInstalled());
+      this.checkDrivers();
+    }
+  }
+
+  private onDriverInstall(data: { stage: string; index?: number; total?: number; title?: string }) {
+    const step = data.total && data.total > 1 ? ` (${(data.index ?? 0) + 1} of ${data.total})` : '';
+    const detail = data.stage === 'restore' ? 'Creating a restore point' : data.stage === 'download' ? `Downloading${step}` : `Installing${step}`;
+    this.setActivity({ id: 'driversInstall', label: 'Installing drivers', detail, route: 'drivers' });
+  }
+
+  // ---- app updates ----
+  async checkUpdate(manual: boolean) {
+    if (this.updateChecking || this.updateInstalling) return;
+    this.updateChecking = true;
+    this.emit();
+    try {
+      const r = await bridge.updateCheck();
+      this.update = r;
+      if (manual) {
+        if (r.available) this.updateDismissed = false;
+        else toast(r.supported ? `You have the latest version, ${r.current}.` : 'Updates only work in the installed app.', 'info');
+      }
+    } catch {
+      // A failed automatic check stays quiet: it runs again later.
+      if (manual) toast("Couldn't check for updates. Check your internet connection.", 'warning');
+    } finally {
+      this.updateChecking = false;
+      this.emit();
+    }
+  }
+
+  dismissUpdate() {
+    this.updateDismissed = true;
+    this.emit();
+  }
+
+  async installUpdate() {
+    if (this.updateInstalling) return;
+    this.updateInstalling = true;
+    this.updatePercent = 0;
+    this.setActivity({ id: 'update', label: 'Updating G Ultra', detail: 'Downloading', route: 'home' });
+    try {
+      const r = await bridge.updateInstall((percent) => {
+        this.updatePercent = percent;
+        this.setActivity({ id: 'update', label: 'Updating G Ultra', detail: `Downloading ${percent}%`, route: 'home' });
+      });
+      if (r.needsPermission) toast('Allow G Ultra to install apps, then press Update again.', 'info');
+    } catch {
+      toast("The update didn't finish. Check your internet connection and try again.", 'warning');
+    } finally {
+      this.updateInstalling = false;
+      this.endActivity('update');
     }
   }
 

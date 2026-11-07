@@ -45,7 +45,12 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1018,7 +1023,7 @@ public class GUltraPlugin extends Plugin {
         }
     }
 
-    // Opens the phone's browser. The app itself still has no internet access.
+    // Opens the phone's browser.
     @PluginMethod
     public void openUrl(PluginCall call) {
         String url = call.getString("url", "");
@@ -1100,6 +1105,145 @@ public class GUltraPlugin extends Plugin {
             androidx.core.app.ActivityCompat.requestPermissions(getActivity(), new String[] {android.Manifest.permission.POST_NOTIFICATIONS}, 7302);
         }
         call.resolve();
+    }
+
+    // ---- app updates ----
+    private static final String LATEST_RELEASE = "https://api.github.com/repos/Manvex/G-Ultra/releases/latest";
+    private volatile String updateUrl;
+    private volatile String updateDigest;
+
+    private static HttpURLConnection connect(String url) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(15000);
+        c.setReadTimeout(30000);
+        c.setRequestProperty("User-Agent", "G-Ultra");
+        return c;
+    }
+
+    private static boolean isNewer(String version, String current) {
+        try {
+            String[] a = version.split("\\.");
+            String[] b = current.split("\\.");
+            for (int i = 0; i < Math.max(a.length, b.length); i++) {
+                int x = i < a.length ? Integer.parseInt(a[i]) : 0;
+                int y = i < b.length ? Integer.parseInt(b[i]) : 0;
+                if (x != y) return x > y;
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        return false;
+    }
+
+    @PluginMethod
+    public void updateCheck(PluginCall call) {
+        async(call, () -> {
+            HttpURLConnection c = connect(LATEST_RELEASE);
+            c.setRequestProperty("Accept", "application/vnd.github+json");
+            org.json.JSONObject release;
+            try {
+                if (c.getResponseCode() != 200) throw new Exception("GitHub answered " + c.getResponseCode());
+                ByteArrayOutputStream body = new ByteArrayOutputStream();
+                try (InputStream in = c.getInputStream()) {
+                    byte[] buf = new byte[8192];
+                    for (int n; (n = in.read(buf)) > 0; ) body.write(buf, 0, n);
+                }
+                release = new org.json.JSONObject(body.toString("UTF-8"));
+            } finally {
+                c.disconnect();
+            }
+
+            String version = release.optString("tag_name", "").replaceFirst("^v", "");
+            String current = getContext().getPackageManager().getPackageInfo(getContext().getPackageName(), 0).versionName;
+            org.json.JSONArray assets = release.optJSONArray("assets");
+            org.json.JSONObject apk = null;
+            for (int i = 0; assets != null && i < assets.length(); i++) {
+                org.json.JSONObject a = assets.getJSONObject(i);
+                if (a.optString("name").endsWith(".apk")) apk = a;
+            }
+            boolean available = apk != null && isNewer(version, current);
+            updateUrl = available ? apk.getString("browser_download_url") : null;
+            updateDigest = available ? apk.optString("digest", "") : null;
+
+            JSObject o = new JSObject();
+            o.put("supported", true);
+            o.put("available", available);
+            o.put("current", current);
+            o.put("version", version);
+            o.put("size", apk != null ? (Object) apk.optLong("size") : JSObject.NULL);
+            o.put("page", release.optString("html_url", ""));
+            return o;
+        });
+    }
+
+    // Android always shows its own confirmation, and refuses an APK signed with a different key.
+    @PluginMethod
+    public void updateInstall(PluginCall call) {
+        String url = updateUrl;
+        String digest = updateDigest;
+        if (url == null) {
+            call.reject("Check for updates first.");
+            return;
+        }
+        Context ctx = getContext();
+        if (!ctx.getPackageManager().canRequestPackageInstalls()) {
+            Intent allow = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + ctx.getPackageName()));
+            allow.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(allow);
+            JSObject o = new JSObject();
+            o.put("needsPermission", true);
+            call.resolve(o);
+            return;
+        }
+        async(call, () -> {
+            File dir = new File(ctx.getCacheDir(), "updates");
+            if (!dir.isDirectory() && !dir.mkdirs()) throw new Exception("No room for the update.");
+            File apk = new File(dir, "G-Ultra.apk");
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
+
+            HttpURLConnection c = connect(url);
+            try {
+                if (c.getResponseCode() != 200) throw new Exception("GitHub answered " + c.getResponseCode());
+                long total = c.getContentLengthLong();
+                long done = 0;
+                int shown = -1;
+                try (InputStream in = c.getInputStream(); FileOutputStream out = new FileOutputStream(apk)) {
+                    byte[] buf = new byte[64 * 1024];
+                    for (int n; (n = in.read(buf)) > 0; ) {
+                        out.write(buf, 0, n);
+                        sha.update(buf, 0, n);
+                        done += n;
+                        int percent = total > 0 ? (int) (done * 100 / total) : 0;
+                        if (percent != shown) {
+                            shown = percent;
+                            JSObject p = new JSObject();
+                            p.put("percent", percent);
+                            notifyListeners("updateProgress", p);
+                        }
+                    }
+                }
+            } finally {
+                c.disconnect();
+            }
+
+            if (digest != null && digest.startsWith("sha256:")) {
+                StringBuilder hex = new StringBuilder();
+                for (byte b : sha.digest()) hex.append(String.format("%02x", b));
+                if (!digest.substring(7).equalsIgnoreCase(hex.toString())) {
+                    apk.delete();
+                    throw new Exception("The download was damaged.");
+                }
+            }
+
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", apk);
+            Intent install = new Intent(Intent.ACTION_VIEW);
+            install.setDataAndType(uri, "application/vnd.android.package-archive");
+            install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(install);
+
+            JSObject o = new JSObject();
+            o.put("started", true);
+            return o;
+        });
     }
 
     // ---- reading system files ----

@@ -13,6 +13,7 @@ G Ultra is licensed under GPL-3.0. It includes or installs the following project
 | HidSharp | Apache-2.0 | https://www.nuget.org/packages/HidSharp |
 | System.Memory, System.CodeDom and related .NET packages | MIT | https://github.com/dotnet |
 | Electron | MIT | https://github.com/electron/electron |
+| electron-updater | MIT | https://github.com/electron-userland/electron-builder |
 
 ## Installed as separate programs
 

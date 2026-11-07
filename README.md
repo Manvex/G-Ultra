@@ -8,8 +8,8 @@
 
 Temperatures, RAM, disk wear, battery health, fans and cleanup in one dark, fluid glass app for Windows and Android.
 
-[![Download for Windows](https://img.shields.io/badge/Download-Windows%20installer-2f81f7?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/Manvex/G-Ultra/releases/latest/download/G-Ultra-Setup-1.0.0.exe)
-[![Download for Android](https://img.shields.io/badge/Download-Android%20APK-3ddc84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Manvex/G-Ultra/releases/latest/download/G-Ultra-1.0.0.apk)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows%20installer-2f81f7?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/Manvex/G-Ultra/releases/latest/download/G-Ultra-Setup.exe)
+[![Download for Android](https://img.shields.io/badge/Download-Android%20APK-3ddc84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Manvex/G-Ultra/releases/latest/download/G-Ultra.apk)
 
 [![Latest release](https://img.shields.io/github/v/release/Manvex/G-Ultra?style=flat-square)](https://github.com/Manvex/G-Ultra/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Manvex/G-Ultra/total?style=flat-square)](https://github.com/Manvex/G-Ultra/releases)
@@ -31,6 +31,7 @@ Temperatures, RAM, disk wear, battery health, fans and cleanup in one dark, flui
 | **Storage** | See what's filling your drives. |
 | **Cleanup** | Remove caches and temporary files, without touching anything still in use. |
 | **Health** | Check the wear on your SSD and other components. |
+| **Drivers** | See your drivers and any devices with a problem, and install updates from Windows Update. You choose what gets installed, and a restore point comes first. |
 | **Components** | List every part in your device, so you know what to buy when replacing one. |
 
 ### Automatic rules
@@ -50,6 +51,8 @@ Long jobs run in the background too, so you can keep using the app while a clean
 | Thermals | ✓ | ✓ |
 | Fan control | ✓ | |
 | Graphics settings | ✓ | |
+| Driver updates | ✓ | |
+| In-app updates | ✓ | ✓ |
 
 What you can read depends on your hardware and on what each system allows apps to access, and Android is the more restricted of the two.
 
@@ -57,7 +60,7 @@ What you can read depends on your hardware and on what each system allows apps t
 
 ### Windows 10 and 11
 
-1. Download [the installer](https://github.com/Manvex/G-Ultra/releases/latest/download/G-Ultra-Setup-1.0.0.exe).
+1. Download [the installer](https://github.com/Manvex/G-Ultra/releases/latest/download/G-Ultra-Setup.exe).
 2. Run it. If Windows SmartScreen appears, select **More info**, then **Run anyway**. It appears because the installer doesn't have a paid code-signing certificate yet.
 3. Leave the sensor driver ticked unless you have a reason not to (see below).
 
@@ -73,9 +76,17 @@ Uninstalling G Ultra removes PawnIO only if G Ultra was the one that installed i
 
 ### Android 8 and later
 
-Download [the APK](https://github.com/Manvex/G-Ultra/releases/latest/download/G-Ultra-1.0.0.apk), open it, and allow installs from your browser if Android asks.
+Download [the APK](https://github.com/Manvex/G-Ultra/releases/latest/download/G-Ultra.apk), open it, and allow installs from your browser if Android asks.
 
 To run in the background, Android requires a visible notification, and it may delay checks while the phone sleeps.
+
+## Updates
+
+When a new version is out, G Ultra shows it at the top of the app. Press **Update**, and it does the rest.
+
+On Windows, it downloads the new version, installs it and restarts. On Android, it downloads the new version and Android asks you to confirm the install.
+
+You can turn off the automatic check in Settings. The check contacts GitHub, and no data from your device is sent.
 
 ## Built to be safe
 
@@ -83,6 +94,7 @@ To run in the background, Android requires a visible notification, and it may de
 - **Important folders are off limits.** Cleanup refuses roots like `C:\`, your user profile, Windows and Desktop, and never follows junctions or symlinks.
 - **Recent files stay.** Temp files newer than 24 hours and files in use are left alone.
 - **Critical processes stay running.** Critical Windows processes can't be closed from the app.
+- **Drivers come from one source.** Driver updates only come from Windows Update, and only the ones you choose are installed.
 - **Fans have limits.** They can't go below 30%, and they return to automatic at 90°C on the CPU or GPU and whenever the app closes.
 
 ## Build it yourself
@@ -111,7 +123,9 @@ Build the Android APK:
 npm run dist:android
 ```
 
-The results land in `release/`. On its first run, the Android build creates your own signing key in `android/`. Keep that key private and back it up, because phones only accept updates signed with the same key.
+The results land in `release/`. To publish a new version, raise the version in `package.json`, build both apps, commit and push, then run `npm run release -- "What changed"`. Installed apps find it from there.
+
+On its first run, the Android build creates your own signing key in `android/`. Keep that key private and back it up, because phones only accept updates signed with the same key.
 
 To work on the interface in a browser with demo data, add `?os=android` to the URL for the phone version:
 

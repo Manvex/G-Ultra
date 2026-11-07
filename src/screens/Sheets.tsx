@@ -5,6 +5,7 @@ import { store, useSettings } from '../lib/store';
 import { tasks, useTasks } from '../lib/tasks';
 import type { ProcessItem } from '../lib/types';
 import { Segmented, SheetClose, Switch, openSheet, toast } from '../ui/kit';
+import { UpdateSettings } from './Updates';
 
 export function requestElevation(close?: () => void) {
   void bridge.win?.elevate().then((r) => {
@@ -70,16 +71,7 @@ export function SettingsSheet({ close }: { close: () => void }) {
             onChange={(v) => store.setSettings({ intervalMs: Number(v) })}
           />
         </div>
-        <div className="list-row">
-          <div className="grow">
-            <div className="row-title">G Ultra 1.0.0</div>
-            <div className="row-sub" style={{ whiteSpace: 'normal' }}>
-              {bridge.platform === 'android'
-                ? 'All data stays on your phone. The app has no internet access.'
-                : 'All data stays on your PC. Sensors use LibreHardwareMonitor (MPL-2.0) and the PawnIO driver.'}
-            </div>
-          </div>
-        </div>
+        <UpdateSettings />
       </div>
     </>
   );

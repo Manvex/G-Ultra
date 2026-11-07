@@ -501,3 +501,44 @@ export interface RamTestState {
   testedBytes?: number;
   message?: string;
 }
+
+export interface DriverUpdate {
+  id: string;
+  title: string;
+  provider: string | null;
+  driverClass: string | null;
+  date: string | null;
+  size: number;
+  needsTerms: boolean;
+}
+
+export interface DriverScan {
+  updates: DriverUpdate[];
+  elevated: boolean;
+}
+
+export interface DriverInstallResult {
+  needsConfirm?: boolean;
+  restore: { state: 'created' | 'recent' | 'unavailable'; message: string };
+  results: { id: string; title: string | null; state: 'installed' | 'failed' | 'skipped'; message: string | null }[];
+  rebootRequired: boolean;
+}
+
+export interface InstalledDrivers {
+  drivers: { name: string; group: string; version: string; provider: string | null; date: string | null }[];
+  problems: { name: string; code: number; meaning: string }[];
+}
+
+export interface UpdateInfo {
+  supported: boolean;
+  available: boolean;
+  current: string;
+  version: string | null;
+  size: number | null;
+  page: string | null;
+}
+
+export interface UpdateStart {
+  started?: boolean;
+  needsPermission?: boolean;
+}

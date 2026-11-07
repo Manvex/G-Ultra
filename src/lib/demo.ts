@@ -123,6 +123,8 @@ export function demoBridge(android: boolean): Bridge {
     monitorSet: async () => ({}),
     monitorHistory: async () => Array.from({ length: 120 }, (_, i) => ({ t: Date.now() - (120 - i) * 60000, cpu: 20 + (i % 17), mem: 55 + (i % 11), temp: 50 + (i % 13) })),
     setAutostart: async () => ({}),
+    updateCheck: async () => ({ supported: false, available: false, current: __APP_VERSION__, version: null, size: null, page: null }),
+    updateInstall: async () => ({}),
     win: android
       ? undefined
       : {
@@ -150,6 +152,9 @@ export function demoBridge(android: boolean): Bridge {
           cleanCancel: async () => ({}),
           setProgress: () => {},
           notify: () => {},
+          driversScan: async () => ({ updates: [{ id: 'a', title: 'Demo driver update', provider: 'Maker', driverClass: 'Display', date: '2026-10-01', size: 500 * 1024 * 1024, needsTerms: false }], elevated: true }),
+          driversInstalled: async () => ({ drivers: [{ name: 'Demo graphics card', group: 'Graphics', version: '32.0.1', provider: 'Maker', date: '2026-06-01' }], problems: [] }),
+          driversInstall: async () => ({ restore: { state: 'created', message: 'Restore point created.' }, results: [], rebootRequired: false }),
           batteryInfo: async () => ({ present: true, percent: 72, charging: false, onAc: false, watts: 8.2, secondsLeft: 12000, saverOn: false, saverThreshold: 20, powerMode: 'balanced', brightness: 60, screenOffSec: 300, sleepSec: 600, cpuMax: 100, refresh: { current: 60, options: [60, 120] }, health: health.battery }),
           batteryReport: async () => ({ history: [{ date: '2026-01-01', full: 48000 }, { date: '2026-07-01', full: 46000 }, { date: '2026-11-01', full: 44000 }], design: 52000, cycles: 310, runtimeSec: 18000, designRuntimeSec: 21000, wearPerYear: 9, yearsTo60: 2.7 }),
           batterySet: async () => ({}),

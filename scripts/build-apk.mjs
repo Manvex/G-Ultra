@@ -38,6 +38,6 @@ const built = debug
   ? join(android, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk')
   : join(android, 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
 mkdirSync(join(root, 'release'), { recursive: true });
-const dest = join(root, 'release', debug ? `G-Ultra-${version}-debug.apk` : `G-Ultra-${version}.apk`);
+const dest = join(root, 'release', debug ? `G-Ultra-${version}-debug.apk` : 'G-Ultra.apk');
 copyFileSync(built, dest);
 console.log('APK:', dest);

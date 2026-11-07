@@ -100,6 +100,7 @@ const ALLOWED = new Set([
   'batteryInfo', 'batteryReport', 'batterySet', 'startupList', 'startupSet', 'components',
   'monitorGet', 'monitorSet', 'monitorHistory', 'autostartSet',
   'ramHealth', 'ramTestStart', 'ramTestCancel', 'ramDiagnostic',
+  'driversScan', 'driversInstalled', 'driversInstall',
 ]);
 
 let win = null;
@@ -205,6 +206,56 @@ function installSensorDriver() {
   });
 }
 
+// ---- app updates ----
+// New versions come from this project's GitHub releases. The download is checked against
+// the hash in the release's latest.yml before anything runs.
+let updater = null;
+
+function getUpdater() {
+  if (!app.isPackaged) return null;
+  if (!updater) {
+    updater = require('electron-updater').autoUpdater;
+    updater.autoDownload = false;
+    updater.autoInstallOnAppQuit = false;
+    updater.logger = null;
+    // Every failure also rejects the call that caused it.
+    updater.on('error', () => {});
+    updater.on('download-progress', (p) => {
+      if (win && !win.isDestroyed()) win.webContents.send('helper-event', 'updateProgress', { percent: Math.round(p.percent) });
+    });
+  }
+  return updater;
+}
+
+async function checkForUpdate() {
+  const current = app.getVersion();
+  const u = getUpdater();
+  if (!u) return { supported: false, available: false, current, version: null, size: null, page: null };
+  const r = await u.checkForUpdates();
+  const version = r?.updateInfo?.version ?? null;
+  return {
+    supported: true,
+    available: !!r?.isUpdateAvailable,
+    current,
+    version,
+    size: r?.updateInfo?.files?.[0]?.size ?? null,
+    page: version ? `https://github.com/Manvex/G-Ultra/releases/tag/v${version}` : null,
+  };
+}
+
+async function installUpdate() {
+  const u = getUpdater();
+  if (!u) throw new Error('Updates only work in the installed app.');
+  await u.downloadUpdate();
+  // The installer force-closes the helper, so the fans go back to automatic first.
+  try {
+    await Promise.race([helper.call('fanAutoAll'), new Promise((r) => setTimeout(r, 2000))]);
+  } catch {}
+  relaunching = true;
+  setTimeout(() => u.quitAndInstall(true, true), 300);
+  return { started: true };
+}
+
 app.setAppUserModelId('com.gultra.app');
 
 const gotLock = SHOT_DIR ? true : app.requestSingleInstanceLock();
@@ -233,6 +284,8 @@ if (!gotLock) {
     });
     ipcMain.handle('elevate', () => relaunchElevated());
     ipcMain.handle('installDriver', () => installSensorDriver());
+    ipcMain.handle('updateCheck', () => checkForUpdate());
+    ipcMain.handle('updateInstall', () => installUpdate());
     ipcMain.handle('reveal', (_e, p) => {
       if (typeof p === 'string') shell.showItemInFolder(p);
     });

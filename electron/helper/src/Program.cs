@@ -61,6 +61,9 @@ namespace GUltra
                 { "ramTestStart", p => RamHealth.TestStart() },
                 { "ramTestCancel", p => RamHealth.TestCancel() },
                 { "ramDiagnostic", p => RamHealth.OpenDiagnostic() },
+                { "driversScan", p => Drivers.Scan() },
+                { "driversInstalled", p => Drivers.Installed() },
+                { "driversInstall", p => Drivers.Install(GetStrList(p, "ids"), GetBool(p, "allowNoRestorePoint")) },
                 { "ping", p => "pong" },
             };
 
