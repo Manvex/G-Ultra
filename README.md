@@ -144,6 +144,8 @@ Build the Windows installer:
 npm run dist:win
 ```
 
+To sign it with the code signing certificate on your PC, and check the result, use `npm run dist:win:signed` instead.
+
 Build the Android APK:
 
 ```bash

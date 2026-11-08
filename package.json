@@ -1,7 +1,7 @@
 {
   "name": "g-ultra",
   "productName": "G Ultra",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "G Ultra: system monitoring and optimization for Windows and Android",
   "author": "ManvexRO",
   "license": "GPL-3.0-only",
@@ -18,7 +18,8 @@
     "dist:win": "npm run build:helper && npm run build:web && electron-builder --win --x64",
     "dist:android": "npm run build:web && npx cap sync android && node scripts/build-apk.mjs",
     "setup": "node scripts/fetch-lhm.mjs && node scripts/fetch-drivers.mjs",
-    "release": "node scripts/publish-release.mjs"
+    "release": "node scripts/publish-release.mjs",
+    "dist:win:signed": "node scripts/dist-signed.mjs"
   },
   "build": {
     "appId": "com.gultra.app",

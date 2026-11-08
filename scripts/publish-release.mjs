@@ -26,4 +26,11 @@ if (!readFileSync(join(root, 'release', 'latest.yml'), 'utf8').includes(`version
   throw new Error(`release/latest.yml isn't version ${version}. Run dist:win again.`);
 }
 
+const installer = join(root, 'release', 'G-Ultra-Setup.exe').replace(/'/g, "''");
+const status = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `[string](Get-AuthenticodeSignature -LiteralPath '${installer}').Status`], { encoding: 'utf8' }).trim();
+console.log(`Installer signature: ${status}`);
+if (status !== 'Valid' && process.env.GULTRA_ALLOW_UNSIGNED !== '1') {
+  throw new Error('The installer is not validly signed. Build with: npm run dist:win:signed');
+}
+
 execFileSync(gh, ['release', 'create', `v${version}`, ...files, '--title', `G Ultra ${version}`, '--notes', notes, '--latest'], { cwd: root, stdio: 'inherit' });
