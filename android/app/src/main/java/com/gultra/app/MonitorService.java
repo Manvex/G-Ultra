@@ -70,10 +70,17 @@ public class MonitorService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Notification n = status("Monitoring in the background");
-        if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(STATUS_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-        } else {
-            startForeground(STATUS_ID, n);
+        try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(STATUS_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            } else {
+                startForeground(STATUS_ID, n);
+            }
+        } catch (RuntimeException e) {
+            // Android 12+ can refuse this when it restarts the service by itself. Uncaught, it
+            // would take the app down too, since they share a process. Opening the app starts it again.
+            stopSelf();
+            return START_NOT_STICKY;
         }
         handler.removeCallbacks(tick);
         handler.post(tick);
@@ -99,7 +106,7 @@ public class MonitorService extends Service {
 
     private Notification status(String text) {
         return new NotificationCompat.Builder(this, CHANNEL_STATUS)
-            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
+            .setSmallIcon(R.drawable.ic_stat_gultra)
             .setContentTitle("G Ultra")
             .setContentText(text)
             .setOngoing(true)
@@ -113,7 +120,7 @@ public class MonitorService extends Service {
         MonitorStore.log(this, kind, text);
         if (!cfg.optBoolean("notifications", true)) return;
         Notification n = new NotificationCompat.Builder(this, CHANNEL_ALERT)
-            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
+            .setSmallIcon(R.drawable.ic_stat_gultra)
             .setContentTitle("G Ultra")
             .setContentText(text)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(text))
@@ -144,8 +151,8 @@ public class MonitorService extends Service {
         }
         try {
             evaluate(cfg);
-        } catch (Exception ignored) {
-            // One failed reading shouldn't stop monitoring.
+        } catch (Throwable ignored) {
+            // One failed reading shouldn't stop monitoring, or close the app with it.
         }
         handler.postDelayed(tick, intervalMs(cfg.optString("mode", "economy")));
     }

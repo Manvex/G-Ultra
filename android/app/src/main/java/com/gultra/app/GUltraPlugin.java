@@ -22,6 +22,8 @@ import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.SystemClock;
@@ -29,11 +31,6 @@ import android.os.storage.StorageManager;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.util.Base64;
-import android.view.View;
-
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -70,6 +67,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @CapacitorPlugin(name = "GUltra")
 public class GUltraPlugin extends Plugin {
 
+    private static final long MONITOR_START_DELAY_MS = 6000;
+
     private final ExecutorService pool = Executors.newFixedThreadPool(3);
     // Long jobs get their own threads, so they can't use up the pool or delay live data.
     private final ExecutorService heavy = Executors.newSingleThreadExecutor();
@@ -79,11 +78,24 @@ public class GUltraPlugin extends Plugin {
 
     @Override
     public void load() {
-        // Opening the app is a safe moment to start monitoring, if it's on.
+        // After the app has finished opening: until then the page needs the main thread,
+        // and Android ends an app whose service is late to show its notification.
+        new Handler(Looper.getMainLooper()).postDelayed(this::startMonitor, MONITOR_START_DELAY_MS);
+    }
+
+    private void startMonitor() {
         try {
             if (MonitorStore.config(getContext()).optBoolean("enabled", true)) MonitorService.start(getContext());
         } catch (Exception ignored) {
+            // Android refuses this if the app has already left the screen. The next opening tries again.
         }
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        pool.shutdown();
+        heavy.shutdown();
+        readings.shutdown();
     }
 
     private interface Job {
@@ -102,7 +114,8 @@ public class GUltraPlugin extends Plugin {
         where.execute(() -> {
             try {
                 call.resolve(job.run());
-            } catch (Exception e) {
+            } catch (Throwable e) {
+                // An uncaught error on these threads would close the app.
                 call.reject(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
             }
         });
@@ -111,7 +124,7 @@ public class GUltraPlugin extends Plugin {
     // ---- system ----
     @PluginMethod
     public void system(PluginCall call) {
-        getActivity().runOnUiThread(() -> {
+        async(call, () -> {
             JSObject o = new JSObject();
             o.put("platform", "android");
             o.put("deviceName", deviceName());
@@ -127,17 +140,7 @@ public class GUltraPlugin extends Plugin {
             o.put("hasBattery", true);
             o.put("elevated", false);
             o.put("uptimeSec", SystemClock.elapsedRealtime() / 1000);
-
-            // Space taken by the status and navigation bars, in CSS pixels.
-            float density = getContext().getResources().getDisplayMetrics().density;
-            View view = getBridge().getWebView();
-            WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(view);
-            if (insets != null) {
-                Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
-                o.put("insetTop", Math.round(bars.top / density));
-                o.put("insetBottom", Math.round(bars.bottom / density));
-            }
-            call.resolve(o);
+            return o;
         });
     }
 
@@ -286,7 +289,7 @@ public class GUltraPlugin extends Plugin {
                 try {
                     sensorsCache = readSensors();
                     sensorsAt = SystemClock.elapsedRealtime();
-                } catch (Exception ignored) {
+                } catch (Throwable ignored) {
                 } finally {
                     sensorsBusy.set(false);
                 }
@@ -371,6 +374,7 @@ public class GUltraPlugin extends Plugin {
                 try {
                     appsCache = readRecentApps();
                     appsAt = SystemClock.elapsedRealtime();
+                } catch (Throwable ignored) {
                 } finally {
                     appsBusy.set(false);
                 }

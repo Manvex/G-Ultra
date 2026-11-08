@@ -135,6 +135,8 @@ export interface Bridge {
 declare global {
   const __APP_VERSION__: string;
   interface Window {
+    /** Called by the Android Back button. Returns false when there's nothing left to go back to. */
+    gultraBack?: () => boolean;
     gultraNative?: {
       rpc(method: string, params?: unknown): Promise<any>;
       window(action: string): Promise<void>;
@@ -286,14 +288,7 @@ function androidBridge(): Bridge {
   const unsupported = () => Promise.reject(new Error('Not available on Android.'));
   return {
     platform: 'android',
-    system: async () => {
-      const s = await p.system();
-      // WebView doesn't always report env(safe-area-inset-*), so these are set directly.
-      const root = document.documentElement.style;
-      if (s.insetTop != null) root.setProperty('--sat', `${s.insetTop}px`);
-      if (s.insetBottom != null) root.setProperty('--sab', `${s.insetBottom}px`);
-      return s;
-    },
+    system: () => p.system(),
     live: () => p.live(),
     memory: () => p.memory(),
     freeRam: () => p.freeRam(),

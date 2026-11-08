@@ -179,19 +179,29 @@ interface ToastData {
 }
 
 let openSheetFn: ((r: SheetRender) => void) | null = null;
+let closeSheetFn: (() => boolean) | null = null;
 let pushToastFn: ((t: ToastData) => void) | null = null;
 let toastId = 1;
 
 export const openSheet = (render: SheetRender) => openSheetFn?.(render);
+/** Closes the open sheet. Returns false if there wasn't one. */
+export const closeSheet = () => closeSheetFn?.() ?? false;
 export const toast = (text: string, kind: ToastKind = 'good') => pushToastFn?.({ id: toastId++, text, kind });
 
 export function Overlays() {
   const [sheet, setSheet] = useState<SheetRender | null>(null);
   const [t, setT] = useState<ToastData | null>(null);
   const timer = useRef<number>(0);
+  const sheetOpen = useRef(false);
+  sheetOpen.current = sheet != null;
 
   useEffect(() => {
     openSheetFn = (r) => setSheet(() => r);
+    closeSheetFn = () => {
+      if (!sheetOpen.current) return false;
+      setSheet(null);
+      return true;
+    };
     pushToastFn = (x) => {
       setT(x);
       clearTimeout(timer.current);
@@ -199,6 +209,7 @@ export function Overlays() {
     };
     return () => {
       openSheetFn = null;
+      closeSheetFn = null;
       pushToastFn = null;
     };
   }, []);

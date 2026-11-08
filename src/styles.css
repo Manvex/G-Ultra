@@ -26,8 +26,9 @@
   --r-tile: 30px;
   --spring: cubic-bezier(0.2, 0.9, 0.25, 1.15);
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --sat: env(safe-area-inset-top, 0px);
-  --sab: env(safe-area-inset-bottom, 0px);
+  /* Capacitor sets the first value: 0 when it has already moved the page clear of the bars. */
+  --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
 }
 
 * {
@@ -40,6 +41,7 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  overscroll-behavior: none;
 }
 
 body {
@@ -355,6 +357,9 @@ button.mode-pill:hover {
 .content {
   flex: 1;
   min-width: 0;
+  /* Without this, in the phone's column layout the page stretches this to its full length
+     and .scroll never has anything to scroll. */
+  min-height: 0;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -362,6 +367,7 @@ button.mode-pill:hover {
 
 .scroll {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 52px 26px 40px;
@@ -1897,18 +1903,35 @@ button.list-row:hover .row-chev {
 }
 
 [data-platform='android'] .glass {
-  background: rgba(255, 255, 255, 0.055);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+  --r-card: 20px;
+  --r-tile: 20px;
+  corner-shape: round;
+  background: #15171d;
+  box-shadow: inset 0 0 0 1px var(--hair);
   isolation: auto;
 }
 
+[data-platform='android'] .btn,
+[data-platform='android'] .tile {
+  corner-shape: round;
+}
+
 [data-platform='android'] .glass::before,
-[data-platform='android'] .glass::after {
+[data-platform='android'] .glass::after,
+[data-platform='android'] .tile-shine {
   display: none;
 }
 
 [data-platform='android'] .sidebar {
   background: #1b1d24;
+}
+
+[data-platform='android'] .sheet {
+  background: #1b1d24;
+}
+
+[data-platform='android'] .volume-tile[aria-pressed='true'] {
+  background: #23262f;
 }
 
 [data-platform='android'] .droplet {
@@ -1926,6 +1949,193 @@ button.list-row:hover .row-chev {
 
 [data-platform='android'] .page {
   animation: none;
+}
+
+/* The liquid is a tint behind the numbers, so they stay easy to read. */
+[data-platform='android'] .tile .liquid {
+  opacity: 0.5;
+}
+
+.tabbar {
+  display: flex;
+  width: 100%;
+}
+
+.tab {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 540;
+  color: var(--ink-2);
+}
+
+.tab-pill {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 28px;
+  border-radius: 14px;
+}
+
+.tab[aria-current='page'] {
+  color: #fff;
+}
+
+.tab[aria-current='page'] .tab-pill {
+  background: rgba(10, 132, 255, 0.32);
+}
+
+.more-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.more-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 84px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 12.5px;
+  font-weight: 540;
+}
+
+.more-item[aria-current='page'] {
+  background: rgba(10, 132, 255, 0.28);
+}
+
+@media (max-width: 720px) {
+  /* Keeps scrolled content from running under the status bar's icons. */
+  [data-platform='android'] .content::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--sat);
+    background: var(--bg);
+    z-index: 20;
+  }
+  [data-platform='android'] .scroll {
+    padding: calc(14px + var(--sat)) 14px calc(80px + var(--sab));
+  }
+  [data-platform='android'] .sidebar {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 3px 6px var(--sab);
+    border-radius: 0;
+    background: #14161c;
+    box-shadow: inset 0 1px 0 var(--hair);
+  }
+  [data-platform='android'] .activity-float {
+    left: 14px;
+    right: 14px;
+    bottom: calc(70px + var(--sab));
+  }
+  [data-platform='android'] .title {
+    font-size: 25px;
+  }
+  [data-platform='android'] .subtitle {
+    font-size: 13.5px;
+  }
+  [data-platform='android'] .hero {
+    gap: 14px;
+    padding: 18px;
+  }
+  [data-platform='android'] .hero-title {
+    font-size: 24px;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    background: none;
+    color: var(--ink);
+  }
+  [data-platform='android'] .grid-4,
+  [data-platform='android'] .grid-2,
+  [data-platform='android'] .grid-3,
+  [data-platform='android'] .grid-mem,
+  [data-platform='android'] .stack {
+    gap: 10px;
+  }
+  [data-platform='android'] .tile {
+    min-height: 128px;
+    padding: 14px;
+  }
+  [data-platform='android'] .tile-top {
+    font-size: 13px;
+  }
+  [data-platform='android'] .tile-value {
+    font-size: 31px;
+  }
+  [data-platform='android'] .tile-value small {
+    font-size: 15px;
+  }
+  [data-platform='android'] .tile-sub {
+    margin-top: 4px;
+    font-size: 12px;
+  }
+  [data-platform='android'] .btn {
+    height: 42px;
+  }
+  [data-platform='android'] .btn.lg {
+    height: 46px;
+  }
+  [data-platform='android'] .btn.sm {
+    height: 36px;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+  [data-platform='android'] .btn.icon {
+    width: 42px;
+    padding: 0;
+  }
+  [data-platform='android'] .segmented {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  [data-platform='android'] .segmented button {
+    flex: none;
+    height: 34px;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+  /* Header rows: a long title pushes the controls onto their own line instead of crushing them. */
+  [data-platform='android'] .card > .row.between {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  /* Notices: the text gets the full width, the buttons go underneath. */
+  [data-platform='android'] .notice {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  [data-platform='android'] .notice > .grow {
+    flex: 1 1 calc(100% - 50px);
+  }
+  [data-platform='android'] .notice > .btn {
+    flex: 1 1 auto;
+  }
+  [data-platform='android'] .sheet {
+    border-radius: 22px 22px 0 0;
+  }
+  [data-platform='android'] .sheet h2 {
+    padding-right: 38px;
+  }
+  [data-platform='android'] .sheet-actions .btn {
+    flex: 1 1 auto;
+  }
 }
 
 /* ---- reduced motion ---- */

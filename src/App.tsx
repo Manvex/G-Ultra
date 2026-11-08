@@ -1,12 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArchiveRestore, BatteryMedium, CircuitBoard, Gpu, HardDrive, HeartPulse, House, Loader2, PackageCheck, MemoryStick, Minus, Radar, Settings, ShieldAlert, Sparkles, Square, Thermometer, X, type LucideIcon } from 'lucide-react';
+import { Component, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ArchiveRestore, BatteryMedium, CircuitBoard, Gpu, HardDrive, HeartPulse, House, LayoutGrid, Loader2, PackageCheck, MemoryStick, Minus, Radar, Settings, ShieldAlert, Sparkles, Square, Thermometer, X, type LucideIcon } from 'lucide-react';
 import logo from './assets/logo.png';
 import { bridge } from './lib/bridge';
 import { shortDevice } from './lib/format';
 import { store, useSettings, useSystem } from './lib/store';
 import { tasks, useTasks, type RouteId } from './lib/tasks';
 import { FluidBackground } from './ui/FluidBackground';
-import { Glass, Overlays, openSheet, useSheen } from './ui/kit';
+import { Glass, Overlays, SheetClose, closeSheet, openSheet, useSheen } from './ui/kit';
 import { makeLens } from './ui/lens';
 import { Battery } from './screens/Battery';
 import { Clean } from './screens/Clean';
@@ -163,6 +163,93 @@ function Nav({ route, routes, onNav }: { route: Route; routes: { id: Route; labe
   );
 }
 
+const PHONE_TABS: Route[] = ['home', 'memory', 'battery', 'storage'];
+const NARROW = '(max-width: 720px)';
+
+function useNarrow() {
+  const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW).matches);
+  useEffect(() => {
+    const query = window.matchMedia(NARROW);
+    const onChange = () => setNarrow(query.matches);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+  return narrow;
+}
+
+function MoreSheet({ route, routes, onNav, close }: { route: Route; routes: { id: Route; label: string; icon: LucideIcon }[]; onNav: (r: Route) => void; close: () => void }) {
+  return (
+    <>
+      <SheetClose onClose={close} />
+      <h2>More</h2>
+      <div className="more-grid">
+        {routes.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            className="more-item"
+            aria-current={route === r.id ? 'page' : undefined}
+            onClick={() => {
+              onNav(r.id);
+              close();
+            }}
+          >
+            <r.icon size={22} strokeWidth={1.8} />
+            <span>{r.label}</span>
+          </button>
+        ))}
+        <button type="button" className="more-item" onClick={() => openSheet((closeSettings) => <SettingsSheet close={closeSettings} />)}>
+          <Settings size={22} strokeWidth={1.8} />
+          <span>Settings</span>
+        </button>
+      </div>
+    </>
+  );
+}
+
+// On a phone the bar never scrolls sideways: the main screens are tabs, the rest sit under More.
+function PhoneNav({ route, routes, onNav }: { route: Route; routes: { id: Route; label: string; icon: LucideIcon }[]; onNav: (r: Route) => void }) {
+  const tabs = routes.filter((r) => PHONE_TABS.includes(r.id));
+  const more = routes.filter((r) => !PHONE_TABS.includes(r.id));
+  return (
+    <nav className="tabbar" aria-label="Main navigation">
+      {tabs.map((r) => (
+        <button key={r.id} type="button" className="tab" aria-current={route === r.id ? 'page' : undefined} onClick={() => onNav(r.id)}>
+          <i className="tab-pill">
+            <r.icon size={21} strokeWidth={route === r.id ? 2.2 : 1.8} />
+          </i>
+          <span>{r.label}</span>
+        </button>
+      ))}
+      <button
+        type="button"
+        className="tab"
+        aria-current={PHONE_TABS.includes(route) ? undefined : 'page'}
+        onClick={() => openSheet((close) => <MoreSheet route={route} routes={more} onNav={onNav} close={close} />)}
+      >
+        <i className="tab-pill">
+          <LayoutGrid size={21} strokeWidth={PHONE_TABS.includes(route) ? 1.8 : 2.2} />
+        </i>
+        <span>More</span>
+      </button>
+    </nav>
+  );
+}
+
+// One screen failing shouldn't leave a dead, empty app: the menu keeps working.
+class PageBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return <div className="empty-state">This screen couldn't be shown. Try another one from the menu.</div>;
+  }
+}
+
 function WindowControls() {
   return (
     <Glass className="win-controls">
@@ -206,6 +293,7 @@ export function App() {
   const routes = useMemo(() => routesFor(isAndroid, isAndroid || !!system?.hasBattery), [isAndroid, system?.hasBattery]);
   const [route, setRoute] = useState<Route>(() => routeFromHash(routes));
   const scrollRef = useRef<HTMLDivElement>(null);
+  const narrow = useNarrow();
   useSheen();
 
   useEffect(() => {
@@ -225,9 +313,22 @@ export function App() {
 
   const nav = (r: Route) => {
     setRoute(r);
-    // replaceState: on Android the Back button leaves the app instead of walking through screens.
+    // replaceState: Back is handled below, so screens don't pile up in the history.
     history.replaceState(null, '', `#/${r}`);
   };
+
+  useEffect(() => {
+    if (!isAndroid) return;
+    window.gultraBack = () => {
+      if (closeSheet()) return true;
+      if (route === 'home') return false;
+      nav('home');
+      return true;
+    };
+    return () => {
+      window.gultraBack = undefined;
+    };
+  }, [isAndroid, route]);
 
   const hasWindowControls = !isAndroid;
   const elevated = system?.elevated ?? false;
@@ -247,7 +348,7 @@ export function App() {
             <div className="brand-sub">{system ? shortDevice(system.deviceName) : ' '}</div>
           </div>
         </div>
-        <Nav route={route} routes={routes} onNav={nav} />
+        {isAndroid && narrow ? <PhoneNav route={route} routes={routes} onNav={nav} /> : <Nav route={route} routes={routes} onNav={nav} />}
         <div className="sidebar-foot">
           <div className="activity-side">
             <ActivityList onNav={nav} />
@@ -275,18 +376,20 @@ export function App() {
         <div className="scroll" ref={scrollRef}>
           <div className="page" key={route}>
             <UpdateBanner />
-            {route === 'home' && <Home nav={nav} />}
-            {route === 'monitor' && <Monitor />}
-            {route === 'memory' && <Memory />}
-            {route === 'thermal' && <Thermal />}
-            {route === 'gpu' && <Graphics nav={nav} />}
-            {route === 'battery' && <Battery nav={nav} />}
-            {route === 'storage' && <Storage />}
-            {route === 'clean' && <Clean />}
-            {route === 'recover' && <Recover />}
-            {route === 'health' && <Health />}
-            {route === 'drivers' && <Drivers />}
-            {route === 'components' && <Components />}
+            <PageBoundary>
+              {route === 'home' && <Home nav={nav} />}
+              {route === 'monitor' && <Monitor />}
+              {route === 'memory' && <Memory />}
+              {route === 'thermal' && <Thermal />}
+              {route === 'gpu' && <Graphics nav={nav} />}
+              {route === 'battery' && <Battery nav={nav} />}
+              {route === 'storage' && <Storage />}
+              {route === 'clean' && <Clean />}
+              {route === 'recover' && <Recover />}
+              {route === 'health' && <Health />}
+              {route === 'drivers' && <Drivers />}
+              {route === 'components' && <Components />}
+            </PageBoundary>
           </div>
         </div>
       </main>
